@@ -1,7 +1,9 @@
-python-telegram-bot==20.7
-flask==3.0.0
-mammoth==1.6.0
-beautifulsoup4==4.12.2
-python-docx==1.1.0
-python-dotenv==1.0.0
-gunicorn==21.2.0
+Flask==3.0.3
+python-telegram-bot==21.6
+mammoth==1.8.0
+beautifulsoup4==4.12.3
+lxml==5.3.0
+requests==2.32.3
+Werkzeug==3.0.4
+Jinja2==3.1.4
+MarkupSafe==2.1.5
