@@ -14,8 +14,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    WebAppInfo, MenuButtonWebApp, ReplyKeyboardMarkup,
-    KeyboardButton
+    WebAppInfo, ReplyKeyboardMarkup, KeyboardButton, BotCommand
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -23,19 +22,23 @@ from telegram.ext import (
 )
 import mammoth
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ==================== KONFIGURATSIYA ====================
-TOKEN = os.getenv("TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-app.onrender.com")
+TOKEN = os.getenv("BOT_TOKEN")
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
+WEBAPP_URL = RENDER_EXTERNAL_URL or os.getenv("WEBAPP_URL", "https://example.com")
 
 if not TOKEN:
-    raise ValueError("TOKEN muhit o'zgaruvchisi o'rnatilmagan!")
+    raise ValueError("BOT_TOKEN o'rnatilmagan! .env faylga BOT_TOKEN=qabul qilingan_token qo'ying")
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 # ==================== DATABASE ====================
-DB_PATH = "test_bot.db"
+DB_PATH = os.getenv("DB_PATH", "test_bot.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -82,14 +85,9 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(user_id),
         FOREIGN KEY (file_id) REFERENCES files(id)
     )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS user_settings (
-        user_id INTEGER PRIMARY KEY,
-        default_test_count INTEGER DEFAULT 10,
-        FOREIGN KEY (user_id) REFERENCES users(user_id)
-    )''')
     conn.commit()
     conn.close()
-    print("✅ Database initialized")
+    print("✅ Database initialized", flush=True)
 
 init_db()
 
@@ -101,7 +99,7 @@ def get_db():
 # ==================== BOT HANDLERS ====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("📩 START COMMAND RECEIVED")  # Log uchun
+    print("📩 /start", flush=True)
     user = update.effective_user
 
     conn = get_db()
@@ -110,86 +108,96 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  VALUES (?, ?, ?, ?)''',
               (user.id, user.username, user.first_name, user.last_name))
     conn.commit()
+
+    # Avval foydalanuvchida telefon raqam bor-yo'qligini tekshiramiz
+    row = c.execute('SELECT phone_number FROM users WHERE user_id = ?', (user.id,)).fetchone()
     conn.close()
 
-    # Telefon raqam so‘rash uchun ReplyKeyboard
-    contact_keyboard = ReplyKeyboardMarkup(
-        [[KeyboardButton("📱 Telefon raqamni ulashish", request_contact=True)]],
-        resize_keyboard=True, one_time_keyboard=True
-    )
-
-    # Asosiy tugmalar
-    inline_keyboard = [
-        [InlineKeyboardButton("🌐 Imtihon platformasiga o‘tish", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
-        [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
-        [InlineKeyboardButton("📊 Mening testlarim", callback_data="my_tests")],
-        [InlineKeyboardButton("📈 Natijalarim", callback_data="my_results")],
-        [InlineKeyboardButton("💡 Yordam", callback_data="help")]
-    ]
-    reply_markup = InlineKeyboardMarkup(inline_keyboard)
-
-    await update.message.reply_text(
-        f"👋 *Imtihon platformasi*\n\n"
-        f"Assalomu alaykum, {user.first_name}!\n"
-        "Bu yerda siz test fayllarni yuklab, imtihon topshirishingiz mumkin.\n\n"
-        "📌 Iltimos, avval telefon raqamingizni ulashing (pastdagi tugma).",
-        parse_mode="Markdown",
-        reply_markup=contact_keyboard
-    )
-
-    # Telefon raqam so‘ralgandan keyin asosiy menyu uchun
-    await update.message.reply_text(
-        "🔽 Telefon raqamni ulashgandan so‘ng, quyidagi tugmalardan foydalaning:",
-        reply_markup=reply_markup
-    )
-
-    # MenuButtonWebApp
-    await context.bot.set_chat_menu_button(
-        chat_id=update.effective_user.id,
-        menu_button=MenuButtonWebApp(
-            text="Imtihon platformasi",
-            web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/'))
+    if not row or not row['phone_number']:
+        # Telefon raqam so'raymiz
+        contact_keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton("📱 Telefon raqamni ulashish", request_contact=True)]],
+            resize_keyboard=True, one_time_keyboard=True
         )
+        await update.message.reply_text(
+            f"👋 Assalomu alaykum, {user.first_name}!\n\n"
+            "📌 Imtihon platformasidan foydalanish uchun avval telefon raqamingizni ulashing.",
+            reply_markup=contact_keyboard
+        )
+    else:
+        # Telefon raqam bor — asosiy menyu
+        await send_main_menu(update, user.first_name)
+
+
+async def send_main_menu(update, first_name):
+    """Asosiy menyu — telefon raqam berilgandan keyin"""
+    inline_keyboard = [
+        [InlineKeyboardButton("🌐 Imtihon platformasiga o'tish", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
+        [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
+        [InlineKeyboardButton("📊 Natijalarim", callback_data="my_results")],
+        [InlineKeyboardButton("💡 Yordam", callback_data="help")],
+    ]
+    await update.message.reply_text(
+        f"✅ Rahmat, {first_name}!\n\n"
+        "Quyidagilardan birini tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard)
     )
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📖 *Yordam*\n\n"
-        "1. 'Test fayl yuklash' – test faylini yuboring (TXT, DOCX, DOC)\n"
-        "2. Yuklangan fayldan test boshlash mumkin\n"
-        "3. Natijalar saqlanadi va istalgan vaqt ko‘rish mumkin",
+        "1️⃣ *Test yuklash*: botga .txt, .docx yoki .doc fayl yuboring\n"
+        "   • .doc yuborsangiz, bot avtomatik .docx ga o'tkazib qaytaradi\n"
+        "2️⃣ *Test topshirish*: 'Imtihon platformasiga o'tish' tugmasini bosing\n"
+        "3️⃣ *Natijalar*: 'Natijalarim' orqali ko'ring\n\n"
+        "⚠️ Eski .doc formatini qo'llab bo'lmaydi, .docx ga o'tkazing",
         parse_mode="Markdown"
     )
 
+
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
-    if contact:
+    user = update.effective_user
+
+    if contact and contact.user_id == user.id:
+        # Faqat o'zining kontaktini qabul qilamiz
         phone = contact.phone_number
         conn = get_db()
         c = conn.cursor()
-        c.execute('UPDATE users SET phone_number = ? WHERE user_id = ?', (phone, update.effective_user.id))
+        c.execute('UPDATE users SET phone_number = ? WHERE user_id = ?', (phone, user.id))
         conn.commit()
         conn.close()
-        await update.message.reply_text("✅ Telefon raqam saqlandi! Endi test yuklashingiz mumkin.")
+
+        # Reply keyboardni olib tashlaymiz
+        remove_keyboard = ReplyKeyboardMarkup([[]], resize_keyboard=True)
+        await update.message.reply_text(
+            f"✅ Telefon raqam saqlandi: {phone}",
+            reply_markup=remove_keyboard
+        )
+        # Asosiy menyu
+        await send_main_menu(update, user.first_name)
     else:
-        await update.message.reply_text("❌ Telefon raqam ulashilmadi.")
+        await update.message.reply_text("❌ Iltimos, o'z telefon raqamingizni ulashing.")
+
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     data = query.data
 
     if data == "upload_file":
         await query.edit_message_text(
-            "📤 *Test faylini yuboring* (TXT, DOCX yoki DOC)\n\n"
-            "Agar .DOC bo‘lsa, bot uni .DOCX ga o‘tkazadi.",
+            "📤 *Test faylini yuboring*\n\n"
+            "Qo'llab-quvvatlanadigan formatlar:\n"
+            "• `.txt` — matn fayli\n"
+            "• `.docx` — zamonaviy Word formati\n"
+            "• `.doc` — eski format (avtomatik .docx ga o'tkaziladi)\n\n"
+            "⚠️ Eski .doc fayl yuborganingizda, bot uni qayta ishlab, "
+            ".docx formatda qaytaradi. Keyin qayta yuklashingiz mumkin.",
             parse_mode="Markdown"
         )
         context.user_data['waiting_for_file'] = True
-
-    elif data == "my_tests":
-        await show_user_tests(query)
 
     elif data == "my_results":
         await show_user_results(query)
@@ -197,78 +205,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "help":
         await query.edit_message_text(
             "📖 *Yordam*\n\n"
-            "1. 'Test fayl yuklash' – test faylini yuboring\n"
-            "2. Fayl yuklangandan so‘ng test boshlash mumkin\n"
-            "3. Natijalar saqlanadi",
+            "1️⃣ Test yuklash: .txt, .docx yoki .doc fayl yuboring\n"
+            "2️⃣ .doc fayl avtomatik .docx ga o'tkaziladi\n"
+            "3️⃣ Imtihon platformasida test topshiring\n"
+            "4️⃣ Natijalaringiz saqlanadi",
             parse_mode="Markdown"
         )
 
     elif data == "back_to_main":
-        await show_main_menu(query)
-
-    elif data.startswith("test_"):
-        file_id = int(data.split("_")[1])
-        await start_test(query, context, file_id)
-
-    elif data.startswith("delete_file_"):
-        file_id = int(data.split("_")[2])
-        await delete_file(query, file_id)
-
-    elif data.startswith("answer_"):
-        await handle_answer(query, context, data)
-
-    elif data == "skip_question":
-        context.user_data['test_skipped'] = context.user_data.get('test_skipped', 0) + 1
-        context.user_data['test_current'] = context.user_data.get('test_current', 0) + 1
-        await show_question(query, context)
-
-    elif data == "finish_test":
-        await finish_test(query, context)
-
-
-async def show_main_menu(query):
-    keyboard = [
-        [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
-        [InlineKeyboardButton("📤 Yuklash", callback_data="upload_file")],
-        [InlineKeyboardButton("📊 Mening testlarim", callback_data="my_tests")],
-        [InlineKeyboardButton("📈 Natijalarim", callback_data="my_results")],
-        [InlineKeyboardButton("💡 Yordam", callback_data="help")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(
-        "👋 *Asosiy menyu*",
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
-
-
-async def show_user_tests(query):
-    user_id = query.from_user.id
-    conn = get_db()
-    c = conn.cursor()
-    files = c.execute('''SELECT id, file_name, uploaded_at,
-                         (SELECT COUNT(*) FROM test_questions WHERE file_id = files.id) as question_count
-                         FROM files WHERE user_id = ? ORDER BY uploaded_at DESC''',
-                      (user_id,)).fetchall()
-    conn.close()
-
-    if not files:
-        keyboard = [[InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]]
-        await query.edit_message_text(
-            "📂 Siz hali hech qanday test yuklamagansiz.",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
-
-    text = "📂 *Mening testlarim*\n\n"
-    keyboard = []
-    for f in files[:5]:
-        text += f"📄 {f['file_name']} — {f['question_count']} savol\n"
-        keyboard.append([
-            InlineKeyboardButton(f"▶️ {f['file_name'][:20]}", callback_data=f"test_{f['id']}")
-        ])
-    keyboard.append([InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")])
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        keyboard = [
+            [InlineKeyboardButton("🌐 Imtihon platformasiga o'tish", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
+            [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
+            [InlineKeyboardButton("📊 Natijalarim", callback_data="my_results")],
+            [InlineKeyboardButton("💡 Yordam", callback_data="help")],
+        ]
+        await query.edit_message_text("👋 Asosiy menyu:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 async def show_user_results(query):
@@ -284,167 +235,26 @@ async def show_user_results(query):
     conn.close()
 
     keyboard = [[InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]]
+
     if not results:
         await query.edit_message_text(
-            "📊 Siz hali hech qanday natijaga ega emassiz.",
+            "📊 Siz hali hech qanday test topshirmagansiz.",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
 
-    text = "📊 *Oxirgi 10 ta natija*\n\n"
+    text = "📊 *Oxirgi 10 ta natija:*\n\n"
     for r in results:
         date = r['test_date'][:16] if r['test_date'] else "N/A"
-        text += f"📄 {r['file_name'][:30]}\n"
+        text += f"📄 {r['file_name']}\n"
         text += f"   📅 {date}\n"
         text += f"   ✅ {r['correct_answers']} | ❌ {r['wrong_answers']} | ⏭️ {r['skipped_answers']}\n"
-        text += f"   📊 Ball: {r['score']}%\n\n"
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-async def start_test(query, context, file_id):
-    user_id = query.from_user.id
-    conn = get_db()
-    c = conn.cursor()
-    settings = c.execute('SELECT default_test_count FROM user_settings WHERE user_id = ?',
-                        (user_id,)).fetchone()
-    default_count = settings['default_test_count'] if settings else 10
-
-    questions = c.execute('SELECT * FROM test_questions WHERE file_id = ?', (file_id,)).fetchall()
-    conn.close()
-
-    if not questions:
-        await query.edit_message_text("❌ Bu faylda savollar topilmadi.")
-        return
-
-    questions = list(questions)
-    total = len(questions)
-    if default_count > 0 and default_count < total:
-        questions = random.sample(questions, default_count)
-
-    context.user_data['test_questions'] = questions
-    context.user_data['test_file_id'] = file_id
-    context.user_data['test_current'] = 0
-    context.user_data['test_answers'] = {}
-    context.user_data['test_correct'] = 0
-    context.user_data['test_wrong'] = 0
-    context.user_data['test_skipped'] = 0
-
-    await show_question(query, context)
-
-
-async def show_question(query, context):
-    questions = context.user_data.get('test_questions', [])
-    current = context.user_data.get('test_current', 0)
-
-    if current >= len(questions):
-        await finish_test(query, context)
-        return
-
-    q = questions[current]
-
-    text = f"📝 *Savol {current + 1}/{len(questions)}*\n\n"
-    text += f"{q['question_text']}\n\n"
-
-    options = [
-        ('A', q['option_a']),
-        ('B', q['option_b']),
-        ('C', q['option_c']),
-        ('D', q['option_d'])
-    ]
-
-    keyboard = []
-    for letter, opt_text in options:
-        if opt_text and opt_text.strip():
-            keyboard.append([InlineKeyboardButton(f"{letter}) {opt_text[:40]}", callback_data=f"answer_{letter}")])
-
-    keyboard.append([InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="skip_question")])
-    keyboard.append([InlineKeyboardButton("📊 Yakunlash", callback_data="finish_test")])
+        text += f"   📊 Ball: *{r['score']}%*\n\n"
 
     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-async def handle_answer(query, context, data):
-    letter = data.split("_")[1]
-    current = context.user_data.get('test_current', 0)
-    questions = context.user_data.get('test_questions', [])
-
-    if current < len(questions):
-        q = questions[current]
-        if letter == q['correct_answer']:
-            context.user_data['test_correct'] = context.user_data.get('test_correct', 0) + 1
-        else:
-            context.user_data['test_wrong'] = context.user_data.get('test_wrong', 0) + 1
-
-        context.user_data['test_answers'] = context.user_data.get('test_answers', {})
-        context.user_data['test_answers'][current] = letter
-        context.user_data['test_current'] = current + 1
-
-        await show_question(query, context)
-
-
-async def finish_test(query, context):
-    correct = context.user_data.get('test_correct', 0)
-    wrong = context.user_data.get('test_wrong', 0)
-    skipped = context.user_data.get('test_skipped', 0)
-    total = len(context.user_data.get('test_questions', []))
-
-    if total == 0:
-        await query.edit_message_text("❌ Xatolik yuz berdi.")
-        return
-
-    score = int((correct / total) * 100)
-
-    user_id = query.from_user.id
-    file_id = context.user_data.get('test_file_id')
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('''INSERT INTO test_results
-                 (user_id, file_id, total_questions, correct_answers, wrong_answers, skipped_answers, score)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)''',
-              (user_id, file_id, total, correct, wrong, skipped, score))
-    conn.commit()
-    conn.close()
-
-    text = "📊 *Test yakunlandi!*\n\n"
-    text += f"✅ To'g'ri: {correct}\n"
-    text += f"❌ Noto'g'ri: {wrong}\n"
-    text += f"⏭️ O'tkazib yuborilgan: {skipped}\n"
-    text += f"📊 Natija: {score}%\n\n"
-
-    if score >= 80:
-        text += "🌟 Ajoyib!"
-    elif score >= 60:
-        text += "👍 Yaxshi!"
-    elif score >= 40:
-        text += "📚 O'rtacha."
-    else:
-        text += "💪 Harakat qiling!"
-
-    keyboard = [[InlineKeyboardButton("🔙 Asosiy menyu", callback_data="back_to_main")]]
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-async def delete_file(query, file_id):
-    user_id = query.from_user.id
-    conn = get_db()
-    c = conn.cursor()
-    row = c.execute('SELECT file_path FROM files WHERE id = ? AND user_id = ?', (file_id, user_id)).fetchone()
-    if row and row['file_path'] and os.path.exists(row['file_path']):
-        try:
-            os.unlink(row['file_path'])
-        except:
-            pass
-    c.execute('DELETE FROM test_questions WHERE file_id = ?', (file_id,))
-    c.execute('DELETE FROM files WHERE id = ? AND user_id = ?', (file_id, user_id))
-    conn.commit()
-    conn.close()
-
-    await query.answer("✅ Fayl o'chirildi")
-    await show_user_tests(query)
-
-
-# ==================== FILE HANDLING (with .doc conversion) ====================
+# ==================== FILE HANDLING ====================
 
 async def convert_doc_to_docx(doc_path):
     """LibreOffice yordamida .doc -> .docx konvertatsiya"""
@@ -454,20 +264,28 @@ async def convert_doc_to_docx(doc_path):
             'libreoffice', '--headless', '--convert-to', 'docx',
             '--outdir', out_dir, doc_path
         ]
-        subprocess.run(cmd, check=True, timeout=60, capture_output=True)
+        result = subprocess.run(cmd, check=True, timeout=120, capture_output=True, text=True)
         base = os.path.basename(doc_path).replace('.doc', '.docx')
         docx_path = os.path.join(out_dir, base)
         if os.path.exists(docx_path):
-            return docx_path
-        return None
+            print(f"✅ .doc -> .docx converted: {docx_path}", flush=True)
+            return docx_path, out_dir
+        print(f"⚠️ .docx not found after conversion. stdout: {result.stdout}", flush=True)
+        return None, out_dir
+    except subprocess.TimeoutExpired:
+        print("❌ LibreOffice timeout", flush=True)
+        return None, None
+    except FileNotFoundError:
+        print("❌ libreoffice topilmadi. Docker image'ga o'rnatilgan bo'lishi kerak", flush=True)
+        return None, None
     except Exception as e:
-        print(f"Conversion error: {e}")
-        return None
+        print(f"❌ Conversion error: {e}", flush=True)
+        return None, None
 
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get('waiting_for_file'):
-        await update.message.reply_text("❗ Avval 'Test fayl yuklash' tugmasini bosing!")
+        await update.message.reply_text("❗ Avval 'Test fayl yuklash' tugmasini bosing.")
         return
 
     document = update.message.document
@@ -475,79 +293,121 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Iltimos, fayl yuboring.")
         return
 
-    file_name = document.file_name
-    file_size = document.file_size
+    file_name = document.file_name or "test"
+    file_size = document.file_size or 0
     ext = os.path.splitext(file_name)[1].lower()
+
+    # Ruxsat berilgan formatlar
+    if ext not in ['.txt', '.docx', '.doc']:
+        await update.message.reply_text(
+            f"❌ '{ext}' formati qo'llab-quvvatlanmaydi.\n"
+            "Faqat .txt, .docx yoki .doc fayl yuboring."
+        )
+        return
+
+    # 20 MB dan katta fayllarni rad etamiz
+    if file_size > 20 * 1024 * 1024:
+        await update.message.reply_text("❌ Fayl hajmi 20 MB dan oshmasligi kerak.")
+        return
 
     processing_msg = await update.message.reply_text("⏳ Fayl qayta ishlanmoqda...")
 
-    file = await context.bot.get_file(document.file_id)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
-        await file.download_to_drive(tmp_file.name)
-        tmp_path = tmp_file.name
+    # Faylni yuklab olish
+    try:
+        tg_file = await context.bot.get_file(document.file_id)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
+            await tg_file.download_to_drive(tmp_file.name)
+            tmp_path = tmp_file.name
+    except Exception as e:
+        print(f"❌ Download error: {e}", flush=True)
+        await processing_msg.edit_text("❌ Faylni yuklab bo'lmadi. Qayta urinib ko'ring.")
+        return
+
+    converted_path = None
+    convert_dir = None
 
     try:
-        # Agar .doc bo‘lsa, .docx ga o‘tkazamiz
+        # .doc -> .docx konvertatsiya
         if ext == '.doc':
-            await processing_msg.edit_text("🔄 .DOC ni .DOCX ga o‘tkazish...")
-            docx_path = await convert_doc_to_docx(tmp_path)
-            if docx_path:
-                with open(docx_path, 'rb') as f:
-                    result = mammoth.convert_to_html(f)
-                    html = result.value
-                questions = parse_html_content(html)
-                os.unlink(tmp_path)
-                tmp_path = docx_path
-                file_name = file_name.replace('.doc', '.docx')
-            else:
+            await processing_msg.edit_text("🔄 .doc -> .docx konvertatsiya...")
+            docx_path, convert_dir = await convert_doc_to_docx(tmp_path)
+            if not docx_path:
                 await processing_msg.edit_text(
-                    "❌ .DOC ni .DOCX ga o‘tkazib bo‘lmadi.\n"
-                    "Iltimos, faylni o‘zingiz Microsoft Word yoki LibreOffice da ochib, "
-                    "'Saqlash, nomi bilan' → .DOCX formatda saqlang va qayta yuboring."
+                    "❌ .doc faylni .docx ga o'tkazib bo'lmadi.\n\n"
+                    "Iltimos, faylni o'zingiz Microsoft Word yoki LibreOffice'da oching:\n"
+                    "1. *Fayl → Saqlash, nomi bilan* (Save As)\n"
+                    "2. Format: *Word Document (.docx)*\n"
+                    "3. Saqlang va menga qayta yuboring",
+                    parse_mode="Markdown"
                 )
-                os.unlink(tmp_path)
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
                 return
+            converted_path = docx_path
 
-        # Endi .txt yoki .docx
-        if ext == '.txt' or file_name.endswith('.txt'):
-            with open(tmp_path, 'r', encoding='utf-8') as f:
+        # Savollarni ajratib olish
+        read_path = converted_path or tmp_path
+        read_ext = '.docx' if converted_path else ext
+
+        await processing_msg.edit_text("📖 Savollar ajratilmoqda...")
+
+        if read_ext == '.txt':
+            with open(read_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             questions = parse_text_content(content)
         else:
-            with open(tmp_path, 'rb') as f:
+            with open(read_path, 'rb') as f:
                 result = mammoth.convert_to_html(f)
                 html = result.value
             questions = parse_html_content(html)
 
+        # read_path endi kerak emas, tozalaymiz (lekin keyin saqlash uchun kerak bo'ladi)
+        # Saqlash logikasi pastda
+
         if not questions:
             await processing_msg.edit_text(
-                "❌ Fayldan savollar topilmadi.\n"
-                "Format: Savol matni, A) variant, B) ..."
+                "❌ Fayldan savollar topilmadi.\n\n"
+                "Fayl formati:\n"
+                "1-qator: Savol matni\n"
+                "2-5 qatorlar: A) B) C) D) variantlar\n"
+                "... yoki jadval ko'rinishida (har bir qator 1 savol)",
+                parse_mode="Markdown"
             )
-            os.unlink(tmp_path)
             return
 
+        # Yuklangan faylni saqlash
         upload_dir = Path("uploads")
         upload_dir.mkdir(exist_ok=True)
 
-        unique_name = f"{update.effective_user.id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name}"
-        file_path = upload_dir / unique_name
-        shutil.move(tmp_path, str(file_path))
+        # .doc bo'lsa .docx ga o'zgartiramiz nomini
+        save_name = file_name
+        if ext == '.doc':
+            save_name = file_name[:-4] + '.docx'
 
+        unique_name = f"{update.effective_user.id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{save_name}"
+        file_path = upload_dir / unique_name
+
+        # Saqlash: .doc -> .docx (konvert qilingan), boshqalar o'z holicha
+        if converted_path and os.path.exists(converted_path):
+            shutil.move(converted_path, str(file_path))
+            if convert_dir and os.path.exists(convert_dir):
+                shutil.rmtree(convert_dir, ignore_errors=True)
+        else:
+            if os.path.exists(tmp_path):
+                shutil.move(tmp_path, str(file_path))
+
+        # Database ga yozish
         user_id = update.effective_user.id
         conn = get_db()
         c = conn.cursor()
-
         c.execute('''INSERT INTO files (user_id, file_name, file_path, file_size, original_name)
                      VALUES (?, ?, ?, ?, ?)''',
-                  (user_id, unique_name, str(file_path), file_size, file_name))
-
+                  (user_id, unique_name, str(file_path), file_size, save_name))
         db_file_id = c.lastrowid
 
         for q in questions:
-            opts = q['options']
-            while len(opts) < 4:
-                opts.append('')
+            opts = q['options'] + [''] * (4 - len(q['options']))
+            opts = opts[:4]
             c.execute('''INSERT INTO test_questions
                          (file_id, question_text, option_a, option_b, option_c, option_d, correct_answer)
                          VALUES (?, ?, ?, ?, ?, ?, ?)''',
@@ -557,57 +417,81 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
         await processing_msg.edit_text(
-            f"✅ *Fayl saqlandi!*\n"
-            f"📄 {file_name}\n"
+            f"✅ *Fayl muvaffaqiyatli saqlandi!*\n\n"
+            f"📄 {save_name}\n"
             f"📊 {len(questions)} ta savol\n\n"
-            "Testni boshlash uchun 'Mening testlarim' bo‘limiga o‘ting.",
+            f"Test topshirish uchun 'Imtihon platformasiga o'tish' tugmasini bosing.",
             parse_mode="Markdown"
         )
         context.user_data['waiting_for_file'] = False
 
     except Exception as e:
-        await processing_msg.edit_text(f"❌ Xatolik: {str(e)}")
+        print(f"❌ handle_file error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        await processing_msg.edit_text(f"❌ Xatolik: {str(e)[:200]}")
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
+        if converted_path and os.path.exists(converted_path):
+            os.unlink(converted_path)
+        if convert_dir and os.path.exists(convert_dir):
+            shutil.rmtree(convert_dir, ignore_errors=True)
 
 
 # ==================== PARSERS ====================
 
 def parse_text_content(text):
-    lines = text.strip().split('\n')
+    """Matndan savollarni ajratish"""
+    lines = [l.strip() for l in text.strip().split('\n') if l.strip()]
     questions = []
     i = 0
     while i < len(lines):
-        line = lines[i].strip()
-        if line and ('?' in line or len(line) > 20):
-            q_text = line
+        line = lines[i]
+        # Savol ehtimoli: "?" bor yoki uzun matn
+        is_q = '?' in line or (len(line) > 30 and not line[0].isdigit() == False)
+        # Raqam bilan boshlangan savollar: "1. Savol matni..."
+        if line and (line[0].isdigit() and ('.' in line[:5] or ')' in line[:5])):
+            # "1. Savol matni" yoki "1) Savol matni" formatda
+            parts = line.split(maxsplit=1)
+            if len(parts) == 2 and len(parts[1]) > 5:
+                line = parts[1]
+                is_q = True
+
+        if is_q:
+            q_text = line.lstrip('0123456789.-) ').strip()
             options = []
             j = i + 1
             while j < len(lines) and len(options) < 4:
-                opt = lines[j].strip()
-                if opt and len(opt) > 1 and opt[0].upper() in 'ABCD' and len(opt) > 1 and opt[1] in ').':
-                    options.append(opt[2:].strip() if len(opt) > 2 else '')
-                elif opt and len(opt) > 1:
+                opt = lines[j]
+                # A) variant matni
+                if opt and len(opt) > 2 and opt[0].upper() in 'ABCD' and opt[1] in ').':
+                    clean = opt[2:].strip() if len(opt) > 2 else ''
+                    if clean:
+                        options.append(clean)
+                # Oddiy variant (harf bilan boshlanmagan)
+                elif opt and len(options) < 4 and not opt[0].isdigit():
                     options.append(opt)
                 j += 1
                 if len(options) >= 4:
                     break
-            if len(options) == 4:
+            if len(options) >= 2:
                 questions.append({
                     'text': q_text,
-                    'options': options,
+                    'options': options[:4],
                     'correct': 'A'
                 })
                 i = j
-            else:
-                i += 1
-        else:
-            i += 1
+                continue
+        i += 1
     return questions
 
+
 def parse_html_content(html):
+    """DOCX dan olingan HTML dan savollarni ajratish"""
     soup = BeautifulSoup(html, 'html.parser')
     questions = []
+
+    # Avval jadvallarni tekshiramiz
     tables = soup.find_all('table')
     for table in tables:
         rows = table.find_all('tr')
@@ -617,18 +501,29 @@ def parse_html_content(html):
                 q_text = cells[0].get_text().strip()
                 opts = []
                 for i in range(1, min(5, len(cells))):
-                    opt = cells[i].get_text().strip()
-                    if opt:
-                        opts.append(opt)
-                if len(opts) == 4 and q_text:
+                    txt = cells[i].get_text().strip()
+                    if txt:
+                        # "A) variant" yoki "A. variant" formatini tozalash
+                        clean = txt
+                        if len(clean) > 2 and clean[0].upper() in 'ABCD' and clean[1] in ').':
+                            clean = clean[2:].strip()
+                        if clean:
+                            opts.append(clean)
+                if len(opts) >= 2 and q_text:
+                    # 4 ta variantga to'ldiramiz
+                    while len(opts) < 4:
+                        opts.append('')
                     questions.append({
                         'text': q_text,
-                        'options': opts,
+                        'options': opts[:4],
                         'correct': 'A'
                     })
+
     if not questions:
+        # Matndan parse qilamiz
         text = soup.get_text()
         questions = parse_text_content(text)
+
     return questions
 
 
@@ -638,26 +533,98 @@ def parse_html_content(html):
 def index():
     return send_from_directory('.', 'index.html')
 
+
 @app.route('/ping')
 def ping():
-    return "Bot is alive"
+    return "ok", 200
 
-@app.route('/api/files/<int:user_id>')
-def get_user_files(user_id):
+
+@app.route('/healthz')
+def healthz():
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route('/api/tests/<int:user_id>')
+def get_user_tests(user_id):
+    """Foydalanuvchining barcha testlarini qaytarish"""
     try:
         conn = get_db()
         c = conn.cursor()
-        files = c.execute('''SELECT id, file_name, uploaded_at,
-                             (SELECT COUNT(*) FROM test_questions WHERE file_id = files.id) as question_count
+        files = c.execute('''SELECT id, original_name as name, uploaded_at as date,
+                             (SELECT COUNT(*) FROM test_questions WHERE file_id = files.id) as questions
                              FROM files WHERE user_id = ? ORDER BY uploaded_at DESC''',
                           (user_id,)).fetchall()
         conn.close()
-        return jsonify({'files': [dict(f) for f in files]})
+        return jsonify({'tests': [dict(f) for f in files]})
     except Exception as e:
+        print(f"❌ get_user_tests error: {e}", flush=True)
+        return jsonify({'error': str(e), 'tests': []}), 500
+
+
+@app.route('/api/test/<int:file_id>')
+def get_test_questions(file_id):
+    """Test savollarini qaytarish"""
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        rows = c.execute('''SELECT question_text, option_a, option_b, option_c, option_d, correct_answer
+                            FROM test_questions WHERE file_id = ?''', (file_id,)).fetchall()
+        conn.close()
+
+        questions = []
+        for r in rows:
+            opts = [r['option_a'], r['option_b'], r['option_c'], r['option_d']]
+            opts = [o for o in opts if o and o.strip()]
+            if len(opts) < 2:
+                continue
+            correct_letter = r['correct_answer']
+            correct_idx = ord(correct_letter) - ord('A') if correct_letter else 0
+            if correct_idx >= len(opts):
+                correct_idx = 0
+            questions.append({
+                'text': r['question_text'],
+                'options': opts,
+                'correct': opts[correct_idx]
+            })
+        return jsonify({'questions': questions})
+    except Exception as e:
+        print(f"❌ get_test_questions error: {e}", flush=True)
+        return jsonify({'error': str(e), 'questions': []}), 500
+
+
+@app.route('/api/save_result', methods=['POST'])
+def save_result():
+    """Test natijasini saqlash"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        file_id = data.get('file_id')
+        total = data.get('total_questions', 0)
+        correct = data.get('correct_answers', 0)
+        wrong = data.get('wrong_answers', 0)
+        skipped = data.get('skipped_answers', 0)
+        score = data.get('score', 0)
+
+        if not user_id or not file_id:
+            return jsonify({'error': 'user_id va file_id kerak'}), 400
+
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('''INSERT INTO test_results
+                     (user_id, file_id, total_questions, correct_answers, wrong_answers, skipped_answers, score)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                  (user_id, file_id, total, correct, wrong, skipped, score))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True})
+    except Exception as e:
+        print(f"❌ save_result error: {e}", flush=True)
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/results/<int:user_id>')
 def get_user_results(user_id):
+    """Foydalanuvchi natijalari"""
     try:
         conn = get_db()
         c = conn.cursor()
@@ -665,30 +632,36 @@ def get_user_results(user_id):
                               FROM test_results tr
                               JOIN files f ON tr.file_id = f.id
                               WHERE tr.user_id = ?
-                              ORDER BY tr.test_date DESC''',
+                              ORDER BY tr.test_date DESC LIMIT 20''',
                            (user_id,)).fetchall()
         conn.close()
         return jsonify({'results': [dict(r) for r in results]})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e), 'results': []}), 500
+
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    print("📨 Webhook received")  # Log uchun
-    json_data = request.get_json(force=True)
-    if json_data and bot_app:
-        update = Update.de_json(json_data, bot_app.bot)
-        asyncio.run_coroutine_threadsafe(
-            bot_app.process_update(update),
-            bot_loop
-        )
-    return "ok", 200
+    print("📨 Webhook POST", flush=True)
+    try:
+        json_data = request.get_json(force=True)
+        if json_data and bot_app and bot_loop:
+            update = Update.de_json(json_data, bot_app.bot)
+            asyncio.run_coroutine_threadsafe(
+                bot_app.process_update(update),
+                bot_loop
+            )
+        return "ok", 200
+    except Exception as e:
+        print(f"❌ Webhook error: {e}", flush=True)
+        return "error", 500
 
 
 # ==================== BOT SETUP ====================
 
 bot_app = None
 bot_loop = None
+
 
 def run_bot():
     global bot_app, bot_loop
@@ -706,35 +679,57 @@ def run_bot():
     async def setup():
         try:
             await bot_app.initialize()
-            webhook_url = WEBAPP_URL.rstrip('/') + '/webhook'
-            await bot_app.bot.delete_webhook(drop_pending_updates=True)
-            await bot_app.bot.set_webhook(webhook_url)
-            print(f"✅ Webhook: {webhook_url}")
 
-            await bot_app.bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(
-                    text="Imtihon platformasi",
-                    web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/'))
-                )
-            )
-            print("✅ MenuButtonWebApp o'rnatildi")
+            # Bot komandalari
+            await bot_app.bot.set_my_commands([
+                BotCommand("start", "Botni ishga tushirish"),
+                BotCommand("help", "Yordam"),
+            ])
 
-            await bot_app.start()
+            # Webhook yoki polling
+            webhook_url = None
+            if RENDER_EXTERNAL_URL:
+                webhook_url = RENDER_EXTERNAL_URL.rstrip('/') + '/webhook'
+            elif os.getenv("WEBHOOK_URL"):
+                webhook_url = os.getenv("WEBHOOK_URL").rstrip('/') + '/webhook'
+
+            if webhook_url:
+                await bot_app.bot.delete_webhook(drop_pending_updates=True)
+                await bot_app.bot.set_webhook(url=webhook_url, allowed_updates=["message", "callback_query"])
+                print(f"✅ Webhook: {webhook_url}", flush=True)
+                # Webhook bilan start() — Updater'siz
+                await bot_app.start()
+            else:
+                # Lokal: polling
+                print("⚠️ Webhook URL yo'q, polling rejimida", flush=True)
+                await bot_app.bot.delete_webhook(drop_pending_updates=True)
+                await bot_app.start()
+                await bot_app.updater.start_polling(drop_pending_updates=True)
+
+            print("✅ Bot tayyor", flush=True)
+
         except Exception as e:
-            print("❌ BOT ERROR:", e)
+            print(f"❌ BOT SETUP ERROR: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
 
     bot_loop.run_until_complete(setup())
-    bot_loop.run_forever()
+    # Webhook rejimida run_forever() — updater yo'q
+    if not (RENDER_EXTERNAL_URL or os.getenv("WEBHOOK_URL")):
+        bot_loop.run_forever()
+    else:
+        bot_loop.run_forever()
 
 
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
-    if not TOKEN:
-        raise ValueError("TOKEN muhit o'zgaruvchisi o'rnatilmagan!")
+    print(f"🚀 Starting bot...", flush=True)
+    print(f"📡 WebApp URL: {WEBAPP_URL}", flush=True)
 
     bot_thread = Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
     port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    print(f"🌐 Flask port: {port}", flush=True)
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
