@@ -7,6 +7,7 @@ import tempfile
 import shutil
 import random
 import subprocess
+import re
 from pathlib import Path
 from threading import Thread
 
@@ -440,120 +441,335 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== PARSERS ====================
 
+def normalize_text(s):
+    """Matnni tozalash"""
+    if not s:
+        return ''
+    s = s.strip()
+    s = s.replace('\xa0', ' ').replace(' ', ' ')
+    s = ' '.join(s.split())  # Ko'p bo'sh joylarni bitta qilish
+    return s
+
+
+def extract_correct_marker(text):
+    """Variant matnidan to'g'ri javob belgisini ajratish
+    Belgilar: +, *, ✓, ✔, ✅, [to'g'ri], (to'g'ri), yoki birinchi variant
+    Qaytaradi: (tozalangan_matn, to_g'ri_mi)
+    """
+    text = normalize_text(text)
+    if not text:
+        return '', False
+
+    is_correct = False
+    clean = text
+
+    # + bilan boshlangan
+    if clean.startswith('+'):
+        is_correct = True
+        clean = clean[1:].strip()
+    # * bilan boshlangan
+    elif clean.startswith('*'):
+        is_correct = True
+        clean = clean[1:].strip()
+    # ✓ yoki ✔ bilan boshlangan
+    elif clean.startswith('✓') or clean.startswith('✔') or clean.startswith('✅'):
+        is_correct = True
+        clean = clean[1:].strip()
+    # [to'g'ri] yoki (to'g'ri) yoki [+] yoki (*) kabi markerlar
+    elif clean.startswith('[+]') or clean.startswith('[*]'):
+        is_correct = True
+        clean = clean[3:].strip()
+    elif clean.startswith('[to') and 'gri' in clean.lower():
+        is_correct = True
+        clean = clean.split(']', 1)[-1].strip() if ']' in clean else clean
+    elif clean.startswith('(to') and 'gri' in clean.lower():
+        is_correct = True
+        clean = clean.split(')', 1)[-1].strip() if ')' in clean else clean
+    elif ' - to\'g\'ri' in clean.lower():
+        is_correct = True
+        clean = re.sub(r'\s*-\s*to.?g.?ri', '', clean, flags=re.IGNORECASE).strip()
+    elif ' - togri' in clean.lower():
+        is_correct = True
+        clean = re.sub(r'\s*-\s*togri', '', clean, flags=re.IGNORECASE).strip()
+
+    return clean, is_correct
+
+
+def strip_option_marker(text):
+    """Variantlardan A), B), 1), -, • kabi markerlarni olib tashlash"""
+    text = normalize_text(text)
+    if not text:
+        return ''
+
+    # A) Boshqarish ... yoki A. Boshqarish ...
+    m = re.match(r'^[A-Da-d][\.\)]\s*(.+)$', text)
+    if m:
+        return m.group(1).strip()
+
+    # 1) Boshqarish ... yoki 1. Boshqarish ...
+    m = re.match(r'^\d{1,2}[\.\)]\s*(.+)$', text)
+    if m:
+        return m.group(1).strip()
+
+    # - Boshqarish ... yoki • Boshqarish ...
+    m = re.match(r'^[-•·▪▫◦○●]\s*(.+)$', text)
+    if m:
+        return m.group(1).strip()
+
+    return text
+
+
 def parse_text_content(text):
     """Matndan savollarni ajratish
-    Format 1: Har bir qatorda 5 ta bo'lim | yoki ; yoki tab bilan ajratilgan
-    [Savol | To'g'ri javob | Xato 1 | Xato 2 | Xato 3]
-    Format 2: Savol matni yangi qatorda, keyin A) B) C) D) variantlar
+
+    Qo'llab-quvvatlanadigan formatlar:
+
+    FORMAT 1 — 5 ta ustunli jadval (| bilan):
+    Savol|To'g'ri javob|Xato 1|Xato 2|Xato 3
+
+    FORMAT 2 — Belgi bilan (to'g'ri javob + bilan):
+    Menejment – bu
+    + Boshqarish va rahbarlikni tashkil etish
+    - Qo'yilgan maqsadga intilish
+    - Boshqaruv haqidagi tasavvur
+    - Samarali boshqaruv
+
+    FORMAT 3 — Klassik (birinchi variant to'g'ri deb olinadi):
+    Menejment – bu?
+    - Boshqarish
+    - Maqsadga intilish
+    - Tasavvur
+    - Samarali boshqaruv
+
+    FORMAT 4 — A) B) C) D):
+    1. Menejment – bu?
+    A) Boshqarish
+    B) Maqsadga intilish
+    C) Tasavvur
+    D) Samarali boshqaruv
     """
-    lines = [l.strip() for l in text.strip().split('\n') if l.strip()]
+    lines = [l for l in text.split('\n')]
+    lines = [l for l in lines if normalize_text(l)]  # Bo'sh qatorlarni tashlash
     questions = []
 
-    # Avval 5-ustunli formatni tekshiramiz
+    # ━━━ FORMAT 1: 5 ta ustunli (| yoki tab) ━━━
     for line in lines:
-        # | yoki ; yoki tab bilan ajratilgan
         if '|' in line:
-            parts = [p.strip() for p in line.split('|') if p.strip()]
+            parts = [p.strip() for p in line.split('|')]
+            parts = [p for p in parts if p]
         elif '\t' in line:
-            parts = [p.strip() for p in line.split('\t') if p.strip()]
+            parts = [p.strip() for p in line.split('\t')]
+            parts = [p for p in parts if p]
         else:
             continue
 
         if len(parts) >= 5:
-            q_text = parts[0]
-            correct = parts[1]
-            wrong_options = parts[2:5]
+            q_text = normalize_text(parts[0])
+            correct = normalize_text(parts[1])
+            wrong = [normalize_text(p) for p in parts[2:5] if normalize_text(p)]
             if q_text and correct:
-                all_options = [correct] + wrong_options
-                while len(all_options) < 4:
-                    all_options.append('')
+                all_opts = [correct] + wrong[:3]
+                while len(all_opts) < 4:
+                    all_opts.append('')
                 questions.append({
                     'text': q_text,
-                    'options': all_options[:4],
+                    'options': all_opts[:4],
                     'correct': 'A'
                 })
 
-    # Agar jadval formatida topmasa, klassik A) B) C) D) formatini sinab ko'ramiz
-    if not questions:
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            is_q = '?' in line or (len(line) > 30 and not line[0].isdigit() == False)
-            if line and (line[0].isdigit() and ('.' in line[:5] or ')' in line[:5])):
-                parts = line.split(maxsplit=1)
-                if len(parts) == 2 and len(parts[1]) > 5:
-                    line = parts[1]
-                    is_q = True
+    if questions:
+        return questions
 
-            if is_q:
-                q_text = line.lstrip('0123456789.-) ').strip()
-                options = []
-                j = i + 1
-                while j < len(lines) and len(options) < 4:
-                    opt = lines[j]
-                    if opt and len(opt) > 2 and opt[0].upper() in 'ABCD' and opt[1] in ').':
-                        clean = opt[2:].strip() if len(opt) > 2 else ''
-                        if clean:
-                            options.append(clean)
-                    elif opt and len(options) < 4 and not opt[0].isdigit():
-                        options.append(opt)
-                    j += 1
-                    if len(options) >= 4:
-                        break
-                if len(options) >= 2:
-                    questions.append({
-                        'text': q_text,
-                        'options': options[:4],
-                        'correct': 'A'
-                    })
-                    i = j
-                    continue
-            i += 1
+    # ━━━ FORMAT 2-4: Savol + variantlar bloki ━━━
+    # Avval har bir qator uchun "savol yoki variant" ehtimolini aniqlaymiz
+    # Lookahead yondashuvi: keyingi 5 qatorga qaraymiz — agar A) B) C) D)
+    # bo'lsa, demak bu savol. Aks holda variant.
+
+    def is_variant_line(line_clean):
+        """Bu qator variant ehtimoli"""
+        if not line_clean:
+            return False
+        if line_clean[0] in '+*✓✔✅':
+            return True
+        if line_clean[0] in '-•·▪▫◦○●':
+            return True
+        if re.match(r'^[A-Da-d][\.\)]\s*\S', line_clean):
+            return True
+        return False
+
+    def next_n_lines_variant(start_idx, n=5):
+        """Keyingi n qator ichida variant bor-yo'qligini tekshirish"""
+        count = 0
+        for i in range(start_idx, min(start_idx + n, len(lines))):
+            line = normalize_text(lines[i])
+            if is_variant_line(line):
+                count += 1
+        return count
+
+    # Har bir qator uchun turkum
+    classified = []
+    for idx, line in enumerate(lines):
+        line_clean = normalize_text(line)
+        if not line_clean:
+            continue
+
+        # ANIQ variant belgilari
+        if is_variant_line(line_clean):
+            classified.append((line_clean, True))
+        else:
+            # Bu savol deb hisoblaymiz (faqat raqam bilan boshlangan bo'lsa)
+            classified.append((line_clean, False))
+
+    # Endi "lookahead" bilan savol/variantlarni qayta aniqlaymiz
+    # Agar "savol" deb belgilangan qatordan keyin 2+ variant bo'lsa, bu savol
+    # Aks holda bu variant ehtimol
+    fixed = []
+    for idx, (line, is_opt) in enumerate(classified):
+        if not is_opt:
+            # Keyingi 6 qator ichida 2+ variant bormi?
+            next_count = 0
+            for j in range(idx + 1, min(idx + 7, len(classified))):
+                if classified[j][1]:
+                    next_count += 1
+            if next_count >= 2:
+                # Bu savol
+                fixed.append((line, False))
+            else:
+                # Variant ko'rinmasa, bu variant bo'lishi mumkin
+                # Lekin "?" yoki uzun matn bo'lsa, savol
+                if '?' in line or len(line) > 50:
+                    fixed.append((line, False))
+                else:
+                    # Qisqa matn — variant
+                    fixed.append((line, True))
+        else:
+            fixed.append((line, True))
+
+    # Endi bloklarga ajratamiz
+    blocks = []
+    current_q = None
+    current_opts = []
+
+    for line_clean, is_option in fixed:
+        if is_option:
+            current_opts.append(line_clean)
+        else:
+            # Yangi savol boshlanyapti — avvalgi blokni saqlash
+            if current_opts:
+                blocks.append((current_q, current_opts))
+                current_opts = []
+            elif current_q is not None:
+                # Savolsiz opts yoki bo'sh blok — e'tibor bermaslik
+                pass
+            current_q = line_clean
+
+    # Oxirgi blok
+    if current_q is not None and current_opts:
+        blocks.append((current_q, current_opts))
+
+    # Har bir blokni qayta ishlash
+    for q_text, opts_lines in blocks:
+        options = []
+        correct_idx = 0  # Default: birinchi variant to'g'ri
+
+        found_explicit_correct = False
+
+        for idx, opt_line in enumerate(opts_lines):
+            # To'g'ri javob belgisini tekshirish
+            clean_opt, is_correct = extract_correct_marker(opt_line)
+            clean_opt = strip_option_marker(clean_opt)
+
+            if not clean_opt:
+                continue
+
+            options.append(clean_opt)
+
+            if is_correct and not found_explicit_correct:
+                correct_idx = len(options) - 1
+                found_explicit_correct = True
+
+        # Savol matnidan raqam va belgilarni tozalash
+        q_text = re.sub(r'^\d{1,3}[\.\)]\s*', '', q_text)
+        q_text = q_text.strip()
+
+        if len(options) >= 2 and q_text:
+            # 4 tagacha to'ldiramiz
+            while len(options) < 4:
+                options.append('')
+            questions.append({
+                'text': q_text,
+                'options': options[:4],
+                'correct': chr(ord('A') + correct_idx) if correct_idx < 4 else 'A'
+            })
 
     return questions
 
 
 def parse_html_content(html):
     """DOCX dan olingan HTML dan savollarni ajratish
-    Format: 5 ta ustunli jadval
-    [Savol matni | To'g'ri javob | Xato 1 | Xato 2 | Xato 3]
+
+    Qo'llab-quvvatlanadigan formatlar:
+    - 5 ta ustunli jadval: [Savol | To'g'ri | Xato 1 | Xato 2 | Xato 3]
+    - 2 ta ustunli jadval: [Savol | To'g'ri javob] (faqat to'g'ri javob, xatolar yo'q)
+    - Matn bloki (DOCX ichida paragraf ko'rinishida)
     """
     soup = BeautifulSoup(html, 'html.parser')
     questions = []
 
-    # Jadvallarni tekshiramiz
+    # ━━━ JADVAL FORMATI ━━━
     tables = soup.find_all('table')
+
     for table in tables:
         rows = table.find_all('tr')
+        if len(rows) < 1:
+            continue
+
         for row in rows:
             cells = row.find_all(['td', 'th'])
+
             if len(cells) >= 5:
-                q_text = cells[0].get_text().strip()
-                correct = cells[1].get_text().strip()
+                # 5 ta ustunli format
+                q_text = normalize_text(cells[0].get_text())
+                correct = normalize_text(cells[1].get_text())
                 wrong = []
                 for i in range(2, min(5, len(cells))):
-                    txt = cells[i].get_text().strip()
+                    txt = normalize_text(cells[i].get_text())
                     if txt:
                         wrong.append(txt)
 
                 if q_text and correct and len(wrong) >= 1:
-                    # To'g'ri javob + xato javoblar = barcha variantlar
-                    all_options = [correct] + wrong[:3]
-                    # 4 tagacha to'ldiramiz
-                    while len(all_options) < 4:
-                        all_options.append('')
+                    all_opts = [correct] + wrong[:3]
+                    while len(all_opts) < 4:
+                        all_opts.append('')
                     questions.append({
                         'text': q_text,
-                        'options': all_options[:4],
-                        'correct': 'A'  # To'g'ri javob 1-o'rinda (A)
+                        'options': all_opts[:4],
+                        'correct': 'A'
                     })
 
-    if not questions:
-        # Matndan parse qilamiz
-        text = soup.get_text()
-        questions = parse_text_content(text)
+            elif len(cells) == 2:
+                # 2 ta ustunli: savol + to'g'ri javob
+                # Xatolarni keyingi qatordan olamiz, yoki default yaratamiz
+                q_text = normalize_text(cells[0].get_text())
+                correct = normalize_text(cells[1].get_text())
 
-    return questions
+                if q_text and correct and len(q_text) > 3 and len(correct) > 1:
+                    # Faqat to'g'ri javob bor, xatolarni 3 ta bo'sh qo'yamiz
+                    # (yoki keyingi qatorlardan olish mumkin)
+                    all_opts = [correct, '', '', '']
+                    questions.append({
+                        'text': q_text,
+                        'options': all_opts,
+                        'correct': 'A'
+                    })
+
+    if questions:
+        return questions
+
+    # ━━━ MATN FORMATI ━━━
+    # DOCX dagi barcha matnni olamiz va parse_text_content ga beramiz
+    text = soup.get_text('\n')
+    return parse_text_content(text)
 
 
 # ==================== FLASK ROUTES ====================
