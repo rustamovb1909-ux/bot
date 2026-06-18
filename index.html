@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Imtihon platformasi</title>
+    <title>Imtihon Platformasi</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -12,123 +12,243 @@
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         :root {
             --bg: #0a0b14;
-            --card: #161827;
-            --card-hover: #1c1f33;
+            --bg2: #11131f;
+            --card: #181b2e;
+            --card2: #1f2238;
+            --card-hover: #252845;
             --border: rgba(255,255,255,0.06);
             --text: #f0f2f7;
             --text-dim: #8b94ad;
             --text-muted: #5a637d;
             --accent: #7c5cfc;
-            --accent-2: #5b3fd9;
+            --accent2: #b8bfff;
             --accent-glow: rgba(124,92,252,0.4);
             --green: #22c55e;
             --green-bg: rgba(34,197,94,0.12);
             --red: #ef4444;
             --red-bg: rgba(239,68,68,0.12);
-            --blue: #3b82f6;
             --orange: #f59e0b;
+            --blue: #3b82f6;
         }
-        html, body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; }
-        body { min-height: 100vh; padding: 12px; }
-        .app { width: 100%; max-width: 480px; margin: 0 auto; }
+        html, body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        body { padding: 14px 12px 90px; }
+        .app { width: 100%; max-width: 520px; margin: 0 auto; }
 
-        /* HEADER */
+        /* ━━━ HEADER ━━━ */
         .header {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 8px 4px 16px;
+            padding: 6px 4px 18px;
         }
         .header .logo {
-            display: flex; align-items: center; gap: 10px;
+            display: flex; align-items: center; gap: 12px;
         }
         .header .logo-icon {
-            width: 38px; height: 38px;
+            width: 44px; height: 44px;
             background: linear-gradient(135deg, #7c5cfc, #5b3fd9);
-            border-radius: 12px;
+            border-radius: 14px;
             display: flex; align-items: center; justify-content: center;
-            color: #fff; font-size: 18px;
-            box-shadow: 0 8px 20px var(--accent-glow);
+            color: #fff; font-size: 20px;
+            box-shadow: 0 8px 24px var(--accent-glow);
         }
-        .header .title h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
-        .header .title p { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+        .header .title h1 {
+            font-size: 17px; font-weight: 800;
+            letter-spacing: -0.3px;
+            background: linear-gradient(135deg, #f0f4ff, #b8bfff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .header .title p { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
         .header .user {
-            width: 38px; height: 38px; border-radius: 50%;
-            background: linear-gradient(135deg, #2a2f45, #1a1e30);
+            display: flex; align-items: center; gap: 8px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 6px 12px 6px 6px;
+            border-radius: 40px;
+        }
+        .header .avatar {
+            width: 30px; height: 30px; border-radius: 50%;
+            background: linear-gradient(135deg, #7c5cfc, #5b3fd9);
             display: flex; align-items: center; justify-content: center;
-            color: #b8bfff; font-weight: 700; font-size: 14px;
-            border: 2px solid rgba(124,92,252,0.25);
+            color: #fff; font-weight: 800; font-size: 13px;
+        }
+        .header .user-name {
+            font-size: 12px; font-weight: 600; color: var(--text);
+            max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
 
-        /* PAGES */
-        .page { display: none; }
-        .page.active { display: block; animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
-        @keyframes slideUp { 0% { opacity: 0; transform: translateY(16px); } 100% { opacity: 1; transform: translateY(0); } }
-        @keyframes pop { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        /* ━━━ QUICK ACTIONS ━━━ */
+        .quick-actions {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            margin-bottom: 22px;
+        }
+        .quick-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px 14px;
+            cursor: pointer; transition: all 0.25s;
+            display: flex; flex-direction: column; gap: 8px;
+            position: relative; overflow: hidden;
+        }
+        .quick-card::before {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(124,92,252,0.08), transparent);
+            opacity: 0; transition: opacity 0.25s;
+        }
+        .quick-card:hover, .quick-card:active {
+            transform: translateY(-2px);
+            border-color: rgba(124,92,252,0.3);
+            background: var(--card2);
+        }
+        .quick-card:hover::before { opacity: 1; }
+        .quick-card .qa-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+        .quick-card .qa-icon.purple { background: rgba(124,92,252,0.15); color: #b8bfff; }
+        .quick-card .qa-icon.green { background: rgba(34,197,94,0.15); color: var(--green); }
+        .quick-card .qa-icon.orange { background: rgba(245,158,11,0.15); color: var(--orange); }
+        .quick-card .qa-icon.blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+        .quick-card .qa-title { font-size: 13.5px; font-weight: 700; }
+        .quick-card .qa-sub { font-size: 11px; color: var(--text-dim); }
+        .quick-card > * { position: relative; z-index: 1; }
 
-        /* CARDS */
-        .section-title { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
-        .section-sub { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+        /* ━━━ SECTIONS ━━━ */
+        .section {
+            margin-bottom: 22px;
+        }
+        .section-head {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .section-head .title {
+            font-size: 16px; font-weight: 700;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .section-head .title i { color: var(--accent); font-size: 14px; }
+        .section-head .count {
+            font-size: 11px; font-weight: 600;
+            color: var(--accent2);
+            background: rgba(124,92,252,0.12);
+            padding: 3px 10px; border-radius: 20px;
+        }
+        .section-head .link {
+            font-size: 12px; color: var(--accent2); cursor: pointer;
+            font-weight: 600;
+        }
 
-        /* TEST CARDS (LIST) */
+        /* ━━━ TEST CARDS ━━━ */
         .tests-grid { display: flex; flex-direction: column; gap: 10px; }
         .test-card {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 16px;
+            border-radius: 16px;
+            padding: 14px;
             display: flex; align-items: center; gap: 14px;
-            cursor: pointer; transition: all 0.2s ease;
+            cursor: pointer; transition: all 0.25s;
             position: relative; overflow: hidden;
         }
         .test-card::before {
             content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-            width: 4px; background: var(--accent);
-            opacity: 0; transition: opacity 0.2s;
+            width: 3px; background: var(--accent);
+            opacity: 0; transition: opacity 0.25s;
         }
         .test-card:hover, .test-card:active {
-            background: var(--card-hover);
-            border-color: rgba(124,92,252,0.3);
-            transform: translateY(-1px);
+            background: var(--card2);
+            border-color: rgba(124,92,252,0.25);
+            transform: translateX(2px);
         }
-        .test-card:hover::before, .test-card:active::before { opacity: 1; }
-        .test-card .icon {
+        .test-card:hover::before { opacity: 1; }
+        .test-card .t-icon {
             width: 44px; height: 44px;
-            background: linear-gradient(135deg, rgba(124,92,252,0.18), rgba(124,92,252,0.08));
+            background: linear-gradient(135deg, rgba(124,92,252,0.18), rgba(124,92,252,0.06));
             border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
             color: #b8bfff; font-size: 18px; flex-shrink: 0;
         }
-        .test-card .info { flex: 1; min-width: 0; }
-        .test-card .info .name {
-            font-size: 15px; font-weight: 600; color: var(--text);
+        .test-card .t-info { flex: 1; min-width: 0; }
+        .test-card .t-name {
+            font-size: 14px; font-weight: 600;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .test-card .info .meta {
-            font-size: 12px; color: var(--text-muted); margin-top: 2px;
+        .test-card .t-meta {
+            font-size: 11.5px; color: var(--text-muted); margin-top: 3px;
+            display: flex; align-items: center; gap: 6px;
         }
-        .test-card .badge {
+        .test-card .t-meta i { font-size: 10px; }
+        .test-card .t-actions { display: flex; align-items: center; gap: 8px; }
+        .test-card .t-badge {
             background: rgba(124,92,252,0.12);
             color: #b8bfff;
             padding: 4px 10px; border-radius: 20px;
-            font-size: 11px; font-weight: 600;
+            font-size: 11px; font-weight: 700;
         }
-        .test-card .arrow { color: var(--text-muted); font-size: 14px; }
+        .test-card .t-play {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #7c5cfc, #5b3fd9);
+            border: none; border-radius: 10px;
+            color: #fff; font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
 
-        /* INFO BANNER */
-        .info-banner {
-            background: linear-gradient(135deg, rgba(124,92,252,0.10), rgba(124,92,252,0.04));
-            border: 1px solid rgba(124,92,252,0.15);
-            border-radius: 14px;
-            padding: 12px 14px;
-            font-size: 12.5px; line-height: 1.5; color: #cdd0e6;
+        /* ━━━ EMPTY / LOADING ━━━ */
+        .empty-state {
+            text-align: center; padding: 50px 20px;
+            background: var(--card); border: 1px dashed var(--border);
+            border-radius: 16px;
+        }
+        .empty-state .icon { font-size: 44px; color: var(--text-muted); margin-bottom: 10px; }
+        .empty-state .text { font-size: 14px; color: var(--text); font-weight: 600; }
+        .empty-state .hint {
+            font-size: 12px; color: var(--text-muted);
+            margin-top: 6px; line-height: 1.5;
+        }
+        .loader {
+            display: inline-block; width: 18px; height: 18px;
+            border: 2.5px solid rgba(255,255,255,0.15);
+            border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+        }
+        .loader.lg { width: 36px; height: 36px; border-width: 3px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ━━━ PAGE TRANSITIONS ━━━ */
+        .page { display: none; }
+        .page.active { display: block; animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ━━━ COUNT PAGE ━━━ */
+        .selected-file-info {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 14px 16px;
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 18px;
+        }
+        .selected-file-info .sfi-icon {
+            width: 38px; height: 38px;
+            background: linear-gradient(135deg, rgba(124,92,252,0.2), rgba(124,92,252,0.06));
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            color: #b8bfff; font-size: 16px;
+        }
+        .selected-file-info .sfi-text { flex: 1; }
+        .selected-file-info .sfi-name { font-size: 14px; font-weight: 600; }
+        .selected-file-info .sfi-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        .count-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
             margin-bottom: 20px;
-            display: flex; align-items: flex-start; gap: 10px;
         }
-        .info-banner i { color: #b8bfff; font-size: 16px; margin-top: 1px; }
-        .info-banner strong { color: var(--text); }
-
-        /* COUNT SELECTION */
-        .count-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .count-card {
             background: var(--card);
             border: 2px solid var(--border);
@@ -137,13 +257,20 @@
             text-align: center;
             cursor: pointer; transition: all 0.2s;
         }
-        .count-card:hover { background: var(--card-hover); }
+        .count-card:hover { background: var(--card2); }
         .count-card.selected {
             border-color: var(--accent);
-            background: linear-gradient(135deg, rgba(124,92,252,0.12), rgba(124,92,252,0.04));
+            background: linear-gradient(135deg, rgba(124,92,252,0.15), rgba(124,92,252,0.04));
+            box-shadow: 0 8px 24px rgba(124,92,252,0.2);
         }
-        .count-card .num { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
-        .count-card .desc { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+        .count-card .num {
+            font-size: 28px; font-weight: 800;
+            letter-spacing: -1px;
+        }
+        .count-card .desc {
+            font-size: 11.5px; color: var(--text-dim); margin-top: 2px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
         .count-card .check {
             width: 22px; height: 22px; border-radius: 50%;
             border: 2px solid var(--border);
@@ -152,78 +279,83 @@
             transition: all 0.2s;
         }
         .count-card.selected .check {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: #fff;
+            background: var(--accent); border-color: var(--accent); color: #fff;
         }
 
-        /* BUTTONS */
+        /* ━━━ BUTTONS ━━━ */
         .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            padding: 14px 24px; border-radius: 14px;
+            padding: 14px 20px; border-radius: 14px;
             font-weight: 700; font-size: 14.5px; cursor: pointer;
             font-family: 'Inter', sans-serif; transition: all 0.2s;
             border: none; text-decoration: none;
+            -webkit-user-select: none; user-select: none;
         }
         .btn-primary {
             background: linear-gradient(135deg, #7c5cfc, #5b3fd9);
             color: #fff;
             box-shadow: 0 8px 24px var(--accent-glow);
         }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 32px var(--accent-glow); }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px var(--accent-glow);
+        }
         .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-secondary {
-            background: var(--card);
-            color: var(--text);
+            background: var(--card); color: var(--text);
             border: 1px solid var(--border);
         }
-        .btn-secondary:hover { background: var(--card-hover); }
-        .btn-danger {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: #fff;
-            box-shadow: 0 6px 18px rgba(239,68,68,0.3);
-        }
+        .btn-secondary:hover { background: var(--card2); }
         .btn-ghost {
             background: transparent; color: var(--text-dim);
+            border: 1px solid var(--border);
         }
-        .btn-ghost:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+        .btn-ghost:hover { background: var(--card); color: var(--text); }
         .btn-block { width: 100%; }
-        .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-row { display: flex; gap: 10px; }
         .btn-row .btn { flex: 1; }
+        .btn-row .btn-back { flex: 0 0 auto; padding: 14px 18px; }
 
-        /* TEST PAGE */
+        /* ━━━ TEST PAGE ━━━ */
         .test-top {
             display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 18px; gap: 10px;
+            gap: 10px; margin-bottom: 16px;
         }
         .test-top .exit-btn {
             background: var(--card); border: 1px solid var(--border);
-            width: 38px; height: 38px; border-radius: 12px;
+            width: 42px; height: 42px; border-radius: 12px;
             color: var(--text-dim); font-size: 14px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
         }
-        .test-top .exit-btn:hover { color: var(--text); }
+        .test-top .exit-btn:hover { color: var(--red); border-color: var(--red); }
         .test-top .timer {
             display: flex; align-items: center; gap: 6px;
             background: var(--card); border: 1px solid var(--border);
-            padding: 6px 14px; border-radius: 20px;
+            padding: 8px 16px; border-radius: 40px;
             font-size: 14px; font-weight: 700;
         }
         .test-top .timer i { color: var(--accent); font-size: 12px; }
         .test-top .timer.warn { color: var(--red); animation: pulse 1s infinite; }
+        @keyframes pulse { 50% { opacity: 0.5; } }
         .test-top .finish-btn {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            border: none; color: #fff; font-weight: 600;
-            padding: 8px 16px; border-radius: 20px;
+            background: linear-gradient(135deg, var(--red), #dc2626);
+            border: none; color: #fff; font-weight: 700;
+            padding: 10px 18px; border-radius: 40px;
             font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 4px 16px rgba(239,68,68,0.3);
         }
 
-        .progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .progress-info {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 6px;
+        }
         .progress-info .label { font-size: 12px; color: var(--text-dim); }
         .progress-info .label strong { color: var(--text); }
-        .progress-info .count { font-size: 12px; color: var(--text-dim); }
+        .progress-info .pct { font-size: 12px; font-weight: 700; color: var(--accent2); }
         .progress-bar {
             height: 6px; background: var(--card);
-            border-radius: 4px; overflow: hidden; margin-bottom: 20px;
+            border-radius: 4px; overflow: hidden; margin-bottom: 18px;
         }
         .progress-fill {
             height: 100%; background: linear-gradient(90deg, #7c5cfc, #b8bfff);
@@ -233,7 +365,7 @@
         .question-card {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 20px;
+            border-radius: 18px;
             padding: 18px;
             margin-bottom: 14px;
         }
@@ -241,50 +373,47 @@
             display: flex; align-items: center; gap: 8px;
             font-size: 11px; color: var(--text-dim);
             margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+            font-weight: 600;
         }
-        .question-meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+        .question-meta .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent); box-shadow: 0 0 8px var(--accent);
+        }
         .question-text {
             font-size: 16px; font-weight: 600; line-height: 1.5;
-            color: var(--text);
         }
 
-        .options { display: flex; flex-direction: column; gap: 10px; }
+        .options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
         .option {
             background: var(--card);
             border: 2px solid var(--border);
             border-radius: 14px;
-            padding: 14px 16px;
+            padding: 14px;
             display: flex; align-items: center; gap: 12px;
-            cursor: pointer; transition: all 0.2s;
-            text-align: left;
-            color: var(--text);
-            font-size: 14.5px;
-            width: 100%;
+            cursor: pointer; transition: all 0.25s;
+            text-align: left; color: var(--text);
+            font-size: 14.5px; width: 100%;
             font-family: 'Inter', sans-serif;
-            position: relative;
         }
         .option:hover:not(.locked) {
             border-color: rgba(124,92,252,0.4);
-            background: var(--card-hover);
+            background: var(--card2);
             transform: translateY(-1px);
         }
-        .option.locked { cursor: default; }
+        .option.locked { cursor: default; pointer-events: none; }
         .option .letter {
-            width: 30px; height: 30px; border-radius: 50%;
+            width: 32px; height: 32px; border-radius: 50%;
             background: rgba(255,255,255,0.05);
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; font-size: 13px;
             color: var(--text-dim); flex-shrink: 0;
-            transition: all 0.2s;
+            transition: all 0.25s;
         }
         .option .text { flex: 1; line-height: 1.4; }
-        .option .icon { font-size: 16px; opacity: 0; transition: opacity 0.2s; }
-
-        .option.selected {
-            border-color: var(--accent);
-            background: linear-gradient(135deg, rgba(124,92,252,0.12), rgba(124,92,252,0.04));
+        .option .icon {
+            font-size: 18px; opacity: 0; transition: opacity 0.25s;
+            flex-shrink: 0;
         }
-        .option.selected .letter { background: var(--accent); color: #fff; }
 
         .option.correct {
             border-color: var(--green);
@@ -300,95 +429,91 @@
         .option.wrong .letter { background: var(--red); color: #fff; }
         .option.wrong .icon { color: var(--red); opacity: 1; }
 
-        .option.faded { opacity: 0.5; }
+        .option.faded { opacity: 0.45; }
 
-        /* NAV NUMBERS */
+        /* ━━━ NAVIGATION ━━━ */
         .nav-section {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 14px;
-            margin-top: 14px;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 14px;
+            margin-bottom: 16px;
         }
         .nav-section .nav-title {
-            font-size: 12px; color: var(--text-dim);
+            font-size: 11px; color: var(--text-dim);
             margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+            font-weight: 600;
         }
         .nav-numbers { display: flex; flex-wrap: wrap; gap: 6px; }
         .nav-btn {
-            width: 36px; height: 36px; border-radius: 10px;
+            min-width: 36px; height: 36px; padding: 0 10px;
+            border-radius: 10px;
             border: 1.5px solid var(--border);
             background: transparent;
             color: var(--text-dim);
-            font-weight: 600; font-size: 12.5px;
+            font-weight: 700; font-size: 12.5px;
             cursor: pointer; transition: all 0.2s;
             font-family: 'Inter', sans-serif;
         }
         .nav-btn:hover { border-color: var(--accent); color: var(--text); }
-        .nav-btn.active {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: #fff;
-        }
+        .nav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
         .nav-btn.correct { background: var(--green); border-color: var(--green); color: #fff; }
         .nav-btn.wrong { background: var(--red); border-color: var(--red); color: #fff; }
 
-        /* RESULTS */
-        .results-card {
+        /* ━━━ RESULTS ━━━ */
+        .results-hero {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 32px 24px;
+            border-radius: 22px;
+            padding: 28px 24px;
             text-align: center;
             margin-bottom: 16px;
         }
         .score-circle {
-            width: 140px; height: 140px;
-            margin: 0 auto 16px;
+            width: 160px; height: 160px;
+            margin: 0 auto 18px;
             position: relative;
-            display: flex; align-items: center; justify-content: center;
         }
-        .score-circle svg { transform: rotate(-90deg); position: absolute; }
+        .score-circle svg { transform: rotate(-90deg); position: absolute; inset: 0; }
         .score-circle circle { fill: none; stroke-width: 10; }
         .score-circle .bg { stroke: var(--border); }
         .score-circle .fg {
-            stroke: url(#scoreGradient);
+            stroke: url(#scoreGrad);
             stroke-linecap: round;
-            transition: stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1);
+            transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .score-center {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
         }
         .score-value {
-            font-size: 32px; font-weight: 800; letter-spacing: -1px;
+            font-size: 38px; font-weight: 900; letter-spacing: -1.5px;
             background: linear-gradient(135deg, #b8bfff, #7c5cfc);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            background-clip: text;
         }
-        .score-label { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+        .score-label { font-size: 11px; color: var(--text-dim); margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
+
         .results-title { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
         .results-subtitle { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
-        .results-stats { display: flex; justify-content: space-around; margin: 20px 0; }
-        .stat-item .num { font-size: 24px; font-weight: 800; }
+
+        .results-stats {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+        .stat-item {
+            background: var(--card2); border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px;
+            text-align: center;
+        }
+        .stat-item .num { font-size: 22px; font-weight: 800; }
         .stat-item .num.green { color: var(--green); }
         .stat-item .num.red { color: var(--red); }
         .stat-item .num.gray { color: var(--text-dim); }
-        .stat-item .lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-
-        /* EMPTY / LOADING */
-        .empty-state {
-            text-align: center; padding: 60px 20px; color: var(--text-muted);
+        .stat-item .lbl {
+            font-size: 10px; color: var(--text-muted);
+            margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px;
         }
-        .empty-state .icon { font-size: 48px; margin-bottom: 12px; color: var(--text-muted); }
-        .empty-state .text { font-size: 14px; }
-        .empty-state .hint { font-size: 12px; margin-top: 6px; color: var(--text-muted); }
-        .loader {
-            display: inline-block; width: 18px; height: 18px;
-            border: 2.5px solid rgba(255,255,255,0.2);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        .loader.lg { width: 32px; height: 32px; border-width: 3px; }
-        @keyframes spin { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
 
+        /* ━━━ TOAST ━━━ */
         .toast {
             position: fixed; bottom: 24px; left: 50%;
             transform: translateX(-50%) translateY(20px);
@@ -397,21 +522,22 @@
             font-size: 13px; color: var(--text);
             opacity: 0; transition: all 0.3s;
             z-index: 100; pointer-events: none;
-            max-width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         }
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
         @media (max-width: 480px) {
-            body { padding: 8px; }
+            body { padding: 10px 8px 80px; }
             .question-card { padding: 14px; }
-            .results-card { padding: 24px 16px; }
+            .results-hero { padding: 22px 16px; }
         }
     </style>
 </head>
 <body>
 
 <div class="app">
-    <!-- HEADER -->
+
+    <!-- ━━━ HEADER ━━━ -->
     <header class="header">
         <div class="logo">
             <div class="logo-icon"><i class="fas fa-graduation-cap"></i></div>
@@ -420,32 +546,70 @@
                 <p id="userSubtitle">Telegram orqali kirdingiz</p>
             </div>
         </div>
-        <div class="user" id="userAvatar">B</div>
+        <div class="user" id="userInfo">
+            <div class="avatar" id="userAvatar">B</div>
+            <div class="user-name" id="userName">User</div>
+        </div>
     </header>
 
-    <!-- PAGE: TESTS LIST -->
-    <div class="page active" id="pageList">
-        <div class="section-title">Mening testlarim</div>
-        <div class="section-sub">Test tanlab, savollar sonini belgilang</div>
-        <div class="info-banner">
-            <i class="fas fa-info-circle"></i>
-            <div>
-                Yangi test yuklash uchun botga <strong>.txt</strong>, <strong>.docx</strong> yoki <strong>.doc</strong> fayl yuboring.
-                Eski <strong>.doc</strong> formatdagi fayllar avtomatik ravishda <strong>.docx</strong> ga oʻtkaziladi.
+    <!-- ━━━ ASOSIY SAHIFA ━━━ -->
+    <div class="page active" id="pageHome">
+        <!-- Quick actions -->
+        <div class="quick-actions">
+            <div class="quick-card" id="qaStart">
+                <div class="qa-icon purple"><i class="fas fa-play"></i></div>
+                <div class="qa-title">Testni boshlash</div>
+                <div class="qa-sub">Tezkor tanlash</div>
+            </div>
+            <div class="quick-card" id="qaUpload">
+                <div class="qa-icon green"><i class="fas fa-cloud-upload-alt"></i></div>
+                <div class="qa-title">Yuklash</div>
+                <div class="qa-sub">Bot orqali</div>
+            </div>
+            <div class="quick-card" id="qaResults">
+                <div class="qa-icon orange"><i class="fas fa-chart-line"></i></div>
+                <div class="qa-title">Natijalar</div>
+                <div class="qa-sub">Tarix</div>
+            </div>
+            <div class="quick-card" id="qaHelp">
+                <div class="qa-icon blue"><i class="fas fa-question-circle"></i></div>
+                <div class="qa-title">Yordam</div>
+                <div class="qa-sub">Qo'llanma</div>
             </div>
         </div>
-        <div id="testsList" class="tests-grid">
-            <div class="empty-state">
-                <div class="loader lg"></div>
-                <div class="text" style="margin-top: 12px;">Yuklanmoqda...</div>
+
+        <!-- Tests section -->
+        <div class="section">
+            <div class="section-head">
+                <div class="title"><i class="fas fa-book"></i> Mening testlarim</div>
+                <div class="count" id="testsCount">0</div>
+            </div>
+            <div id="testsList" class="tests-grid">
+                <div class="empty-state">
+                    <div class="loader lg"></div>
+                    <div class="text" style="margin-top:12px;">Yuklanmoqda...</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- PAGE: COUNT -->
+    <!-- ━━━ SAVOLLAR SONI ━━━ -->
     <div class="page" id="pageCount">
-        <div class="section-title">Savollar soni</div>
-        <div class="section-sub" id="selectedFileInfo">Fayl tanlanmagan</div>
+        <div class="section-head">
+            <div class="title"><i class="fas fa-sliders-h"></i> Sozlamalar</div>
+            <div class="link" id="backToHome1"><i class="fas fa-arrow-left"></i> Ortga</div>
+        </div>
+        <div class="selected-file-info">
+            <div class="sfi-icon"><i class="fas fa-file-alt"></i></div>
+            <div class="sfi-text">
+                <div class="sfi-name" id="selectedFileName">Fayl</div>
+                <div class="sfi-meta" id="selectedFileMeta">0 ta savol</div>
+            </div>
+        </div>
+
+        <div class="section-head">
+            <div class="title" style="font-size:14px;">Savollar soni</div>
+        </div>
         <div class="count-grid" id="countGrid">
             <div class="count-card" data-value="10">
                 <div class="num">10</div>
@@ -463,30 +627,31 @@
                 <div class="check"><i class="fas fa-check"></i></div>
             </div>
             <div class="count-card" data-value="all">
-                <div class="num"><i class="fas fa-infinity"></i></div>
+                <div class="num" style="font-size:32px;"><i class="fas fa-infinity"></i></div>
                 <div class="desc">Barchasi</div>
                 <div class="check"><i class="fas fa-check"></i></div>
             </div>
         </div>
-        <div class="btn-row">
-            <button class="btn btn-ghost" id="backToList"><i class="fas fa-arrow-left"></i> Ortga</button>
-            <button class="btn btn-primary" id="startTestBtn" disabled><i class="fas fa-play"></i> Boshlash</button>
-        </div>
+
+        <button class="btn btn-primary btn-block" id="startTestBtn" disabled>
+            <i class="fas fa-play"></i> Testni boshlash
+        </button>
     </div>
 
-    <!-- PAGE: TEST -->
+    <!-- ━━━ TEST ━━━ -->
     <div class="page" id="pageTest">
         <div class="test-top">
-            <button class="exit-btn" id="exitTestBtn"><i class="fas fa-times"></i></button>
+            <button class="exit-btn" id="exitTestBtn" title="Chiqish"><i class="fas fa-times"></i></button>
             <div class="timer" id="timerBox">
                 <i class="fas fa-clock"></i>
                 <span id="timerText">00:00</span>
             </div>
-            <button class="finish-btn" id="finishTestBtn"><i class="fas fa-flag-checkered"></i> Yakunlash</button>
+            <button class="finish-btn" id="finishTestBtn"><i class="fas fa-flag-checkered"></i> Tugatish</button>
         </div>
+
         <div class="progress-info">
             <span class="label">Savol <strong id="qNumber">1</strong> / <strong id="qTotal">0</strong></span>
-            <span class="count" id="progressText">0 ta javoblandi</span>
+            <span class="pct" id="progressText">0%</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%;"></div></div>
 
@@ -501,32 +666,33 @@
         <div class="options" id="optionsContainer"></div>
 
         <div class="nav-section" id="navSection" style="display:none;">
-            <div class="nav-title">Savollar</div>
+            <div class="nav-title"><i class="fas fa-th"></i> Savollar</div>
             <div class="nav-numbers" id="navNumbers"></div>
         </div>
     </div>
 
-    <!-- PAGE: RESULTS -->
+    <!-- ━━━ NATIJALAR ━━━ -->
     <div class="page" id="pageResults">
-        <div class="results-card">
+        <div class="results-hero">
             <div class="score-circle">
-                <svg width="140" height="140">
+                <svg width="160" height="160" viewBox="0 0 160 160">
                     <defs>
-                        <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#7c5cfc" />
                             <stop offset="100%" stop-color="#b8bfff" />
                         </linearGradient>
                     </defs>
-                    <circle class="bg" cx="70" cy="70" r="60" />
-                    <circle class="fg" id="scoreCircle" cx="70" cy="70" r="60" stroke-dasharray="377" stroke-dashoffset="377" />
+                    <circle class="bg" cx="80" cy="80" r="70" />
+                    <circle class="fg" id="scoreCircle" cx="80" cy="80" r="70"
+                            stroke-dasharray="440" stroke-dashoffset="440" />
                 </svg>
-                <div>
+                <div class="score-center">
                     <div class="score-value" id="resultScore">0%</div>
                     <div class="score-label">Natija</div>
                 </div>
             </div>
             <div class="results-title" id="resultTitle">Yakunlandi!</div>
-            <div class="results-subtitle" id="resultSub">Yaxshi harakat</div>
+            <div class="results-subtitle" id="resultSub">Test natijalari</div>
             <div class="results-stats">
                 <div class="stat-item">
                     <div class="num green" id="rCorrect">0</div>
@@ -543,10 +709,11 @@
             </div>
         </div>
         <div class="btn-row">
-            <button class="btn btn-secondary" id="backToListFromResults"><i class="fas fa-home"></i> Bosh sahifa</button>
+            <button class="btn btn-ghost btn-back" id="backToHome2"><i class="fas fa-home"></i></button>
             <button class="btn btn-primary" id="restartBtn"><i class="fas fa-redo"></i> Qaytadan</button>
         </div>
     </div>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -556,16 +723,15 @@
 
 // ━━━ TELEGRAM ━━━
 const tg = window.Telegram && window.Telegram.WebApp;
-if (tg) {
-    tg.ready();
-    tg.expand();
-}
+if (tg) { tg.ready(); tg.expand(); }
+
 const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
 const tgUserId = tgUser ? tgUser.id : null;
-const tgUserName = tgUser ? (tgUser.first_name || 'F') : 'B';
+const tgUserName = tgUser ? (tgUser.first_name || 'Foydalanuvchi') : 'Brauzer';
 
 if (tgUser) {
     document.getElementById('userAvatar').textContent = tgUserName[0].toUpperCase();
+    document.getElementById('userName').textContent = tgUserName;
     document.getElementById('userSubtitle').textContent = `${tgUserName} · Imtihon platformasi`;
 }
 
@@ -581,8 +747,6 @@ const state = {
     seconds: 0,
     isFinished: false,
     isLocked: false,
-    testId: null,
-    startTime: null,
 };
 
 const API = window.location.origin;
@@ -592,7 +756,8 @@ function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2500);
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
 function escapeHtml(s) {
@@ -616,14 +781,13 @@ function formatDate(d) {
     try { return d.split('T')[0].replace(/-/g, '.'); } catch (e) { return d; }
 }
 
-// ━━━ NAVIGATION ━━━
 function showPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ━━━ LOAD TESTS ━━━
+// ━━━ TESTS LOAD ━━━
 async function loadTests() {
     if (!tgUserId) {
         renderEmpty('Telegram orqali kiring', 'Botni qayta oching');
@@ -633,6 +797,7 @@ async function loadTests() {
         const resp = await fetch(`${API}/api/tests/${tgUserId}`);
         const data = await resp.json();
         state.tests = data.tests || [];
+        document.getElementById('testsCount').textContent = state.tests.length;
         if (state.tests.length === 0) {
             renderEmpty('Hozircha test yoʻq', 'Botga .txt, .docx yoki .doc fayl yuboring');
         } else {
@@ -640,7 +805,7 @@ async function loadTests() {
         }
     } catch (e) {
         console.error('Test yuklash xatosi:', e);
-        renderEmpty('Yuklashda xatolik', 'Internetni tekshiring va sahifani yangilang');
+        renderEmpty('Yuklashda xatolik', 'Internetni tekshiring');
     }
 }
 
@@ -658,34 +823,50 @@ function renderTests() {
     const list = document.getElementById('testsList');
     list.innerHTML = state.tests.map(t => `
         <div class="test-card" data-id="${t.id}">
-            <div class="icon"><i class="fas fa-file-alt"></i></div>
-            <div class="info">
-                <div class="name">${escapeHtml(t.name)}</div>
-                <div class="meta">${t.questions} ta savol · ${formatDate(t.date)}</div>
+            <div class="t-icon"><i class="fas fa-file-alt"></i></div>
+            <div class="t-info">
+                <div class="t-name">${escapeHtml(t.name)}</div>
+                <div class="t-meta">
+                    <i class="fas fa-list"></i>
+                    <span>${t.questions} ta savol</span>
+                    <span>·</span>
+                    <span>${formatDate(t.date)}</span>
+                </div>
             </div>
-            <div class="badge">${t.questions}</div>
-            <i class="fas fa-chevron-right arrow"></i>
+            <div class="t-actions">
+                <div class="t-badge">${t.questions}</div>
+                <button class="t-play" data-id="${t.id}">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
         </div>
     `).join('');
 
-    list.querySelectorAll('.test-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const id = parseInt(card.dataset.id);
+    list.querySelectorAll('.test-card, .t-play').forEach(el => {
+        el.addEventListener('click', (e) => {
+            const id = parseInt(el.dataset.id);
             const t = state.tests.find(x => x.id === id);
             if (!t) return;
             state.selectedTestId = id;
-            document.getElementById('selectedFileInfo').textContent = `${t.name} · ${t.questions} ta savol`;
+            document.getElementById('selectedFileName').textContent = t.name;
+            document.getElementById('selectedFileMeta').textContent = `${t.questions} ta savol mavjud`;
             document.getElementById('startTestBtn').disabled = false;
             showPage('pageCount');
         });
     });
 }
 
-// ━━━ LOAD TEST QUESTIONS ━━━
+// ━━━ LOAD QUESTIONS ━━━
 async function loadTestQuestions(testId) {
-    const resp = await fetch(`${API}/api/test/${testId}`);
-    const data = await resp.json();
-    return data.questions || [];
+    try {
+        const resp = await fetch(`${API}/api/test/${testId}`);
+        const data = await resp.json();
+        return data.questions || [];
+    } catch (e) {
+        console.error('Savollarni yuklashda xatolik:', e);
+        showToast('Savollarni yuklashda xatolik');
+        return [];
+    }
 }
 
 // ━━━ COUNT SELECTION ━━━
@@ -697,9 +878,7 @@ document.querySelectorAll('.count-card').forEach(card => {
     });
 });
 
-document.getElementById('backToList').addEventListener('click', () => {
-    showPage('pageList');
-});
+document.getElementById('backToHome1').addEventListener('click', () => showPage('pageHome'));
 
 // ━━━ START TEST ━━━
 document.getElementById('startTestBtn').addEventListener('click', async () => {
@@ -721,24 +900,37 @@ document.getElementById('startTestBtn').addEventListener('click', async () => {
         return;
     }
 
-    // Variantlarni aralashtirish
     const shuffledQuestions = shuffle(allQuestions).map(q => {
-        const correctText = q.options[q.correct];
-        const shuffledOpts = shuffle(q.options);
+        // q.correct — to'g'ri javob indeksi (serverdan keladi)
+        const correctIdx = q.correct;
+        const correctText = q.options[correctIdx];
+        // Variantlarni aralashtiramiz, lekin bo'sh variantlarni olib tashlaymiz
+        const realOptions = q.options.filter(o => o && o.trim());
+        const shuffledOpts = shuffle(realOptions);
+        // Yangi indeksni topamiz — matn bo'yicha
+        let newCorrect = shuffledOpts.indexOf(correctText);
+        if (newCorrect === -1) {
+            // Topilmasa, asl indeksni ishlatamiz
+            newCorrect = Math.min(correctIdx, shuffledOpts.length - 1);
+            if (newCorrect < 0) newCorrect = 0;
+        }
+        // 4 tagacha to'ldiramiz
+        while (shuffledOpts.length < 4) shuffledOpts.push('');
         return {
             text: q.text,
-            options: shuffledOpts,
-            correct: shuffledOpts.indexOf(correctText)
+            options: shuffledOpts.slice(0, 4),
+            correct: newCorrect,
         };
     });
 
-    const total = state.selectedCount === 'all' ? shuffledQuestions.length : Math.min(parseInt(state.selectedCount), shuffledQuestions.length);
+    const total = state.selectedCount === 'all'
+        ? shuffledQuestions.length
+        : Math.min(parseInt(state.selectedCount), shuffledQuestions.length);
     state.questions = shuffledQuestions.slice(0, total);
     state.currentIndex = 0;
     state.answers = {};
     state.isFinished = false;
     state.isLocked = false;
-    state.startTime = Date.now();
 
     document.getElementById('qTotal').textContent = total;
     document.getElementById('navSection').style.display = 'block';
@@ -771,17 +963,19 @@ function updateTimer() {
     else box.classList.remove('warn');
 }
 
-// ━━━ RENDER QUESTION ━━━
+// ━━━ QUESTION RENDER ━━━
 function renderQuestion() {
     const q = state.questions[state.currentIndex];
     if (!q) return;
 
     const total = state.questions.length;
     const answered = Object.keys(state.answers).length;
+    const pct = Math.round((answered / total) * 100);
+
     document.getElementById('qNumber').textContent = state.currentIndex + 1;
     document.getElementById('qTotal').textContent = total;
-    document.getElementById('progressText').textContent = `${answered} ta javoblandi`;
-    document.getElementById('progressFill').style.width = `${(answered/total)*100}%`;
+    document.getElementById('progressText').textContent = `${pct}%`;
+    document.getElementById('progressFill').style.width = `${pct}%`;
     document.getElementById('qText').textContent = q.text;
 
     const cont = document.getElementById('optionsContainer');
@@ -794,7 +988,6 @@ function renderQuestion() {
         </button>
     `).join('');
 
-    // Agar bu savolga javob berilgan bo'lsa
     const savedAnswer = state.answers[state.currentIndex];
     if (savedAnswer !== undefined) {
         lockOptions(q, savedAnswer);
@@ -803,7 +996,6 @@ function renderQuestion() {
             opt.addEventListener('click', () => handleOptionClick(opt, q));
         });
     }
-
     renderNav();
 }
 
@@ -816,11 +1008,11 @@ function handleOptionClick(optEl, q) {
     lockOptions(q, i);
     renderNav();
 
-    // Keyingi savolga o'tish
     setTimeout(() => {
         if (state.currentIndex < state.questions.length - 1) {
             state.currentIndex++;
             renderQuestion();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }, 700);
 }
@@ -832,15 +1024,12 @@ function lockOptions(q, selectedIdx) {
 
     opts.forEach((o, idx) => {
         o.classList.add('locked');
-        o.style.pointerEvents = 'none';
         const icon = o.querySelector('.icon');
 
         if (idx === q.correct) {
-            // To'g'ri javob
             o.classList.add('correct');
             icon.className = 'fas fa-check-circle icon';
         } else if (idx === selectedIdx) {
-            // Noto'g'ri javob
             o.classList.add('wrong');
             icon.className = 'fas fa-times-circle icon';
         } else {
@@ -859,7 +1048,7 @@ function renderNav() {
             if (state.answers[i] === state.questions[i].correct) cls += ' correct';
             else cls += ' wrong';
         }
-        html += `<button class="${cls}" data-i="${i}">${i+1}</button>`;
+        html += `<button class="${cls}" data-i="${i}">${i + 1}</button>`;
     }
     document.getElementById('navNumbers').innerHTML = html;
     document.querySelectorAll('.nav-btn').forEach(b => {
@@ -868,6 +1057,7 @@ function renderNav() {
             state.currentIndex = parseInt(b.dataset.i);
             state.isLocked = false;
             renderQuestion();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
 }
@@ -889,13 +1079,12 @@ function finishTest() {
     });
 
     const total = state.questions.length;
-    const pct = total > 0 ? Math.round((correct/total)*100) : 0;
+    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
 
-    // Natijalarni ko'rsatish
     document.getElementById('resultScore').textContent = `${pct}%`;
 
     let title, subtitle;
-    if (pct >= 80) { title = '🌟 Ajoyib!'; subtitle = 'Siz juda yaxshi natija koʻrsatdingiz'; }
+    if (pct >= 80) { title = '🌟 Ajoyib!'; subtitle = 'Juda yaxshi natija'; }
     else if (pct >= 60) { title = '👍 Yaxshi!'; subtitle = 'Bilim darajangiz yaxshi'; }
     else if (pct >= 40) { title = '📚 Oʻrtacha'; subtitle = 'Koʻproq mashq qiling'; }
     else { title = '💪 Harakat qiling'; subtitle = 'Bilim olishda davom eting'; }
@@ -906,16 +1095,13 @@ function finishTest() {
     document.getElementById('rWrong').textContent = wrong;
     document.getElementById('rSkipped').textContent = skipped;
 
-    // Score circle animatsiya
-    const circumference = 2 * Math.PI * 60; // 376.99
+    const circumference = 2 * Math.PI * 70;
     const offset = circumference - (pct / 100) * circumference;
     setTimeout(() => {
         document.getElementById('scoreCircle').style.strokeDashoffset = offset;
     }, 100);
 
-    // Serverga saqlash
     saveResult(pct, correct, wrong, skipped, total);
-
     showPage('pageResults');
 }
 
@@ -933,20 +1119,19 @@ async function saveResult(score, correct, wrong, skipped, total) {
                 wrong_answers: wrong,
                 skipped_answers: skipped,
                 score: score,
-            })
+            }),
         });
-    } catch (e) { console.error('Natijani saqlashda xatolik:', e); }
+    } catch (e) { console.error('Natijani saqlash xatosi:', e); }
 }
 
 document.getElementById('finishTestBtn').addEventListener('click', finishTest);
 document.getElementById('exitTestBtn').addEventListener('click', () => {
-    if (state.isFinished || confirm('Testdan chiqmoqchimisiz? Javoblaringiz saqlanmaydi.')) {
+    if (state.isFinished || confirm('Chiqmoqchimisiz? Javoblar saqlanmaydi.')) {
         if (state.timerInterval) clearInterval(state.timerInterval);
         state.isFinished = true;
-        showPage('pageList');
+        showPage('pageHome');
     }
 });
-
 document.getElementById('restartBtn').addEventListener('click', () => {
     if (state.timerInterval) clearInterval(state.timerInterval);
     state.isFinished = false;
@@ -955,11 +1140,46 @@ document.getElementById('restartBtn').addEventListener('click', () => {
     state.currentIndex = 0;
     document.querySelectorAll('.count-card').forEach(c => c.classList.remove('selected'));
     state.selectedCount = null;
-    showPage('pageList');
+    showPage('pageHome');
 });
+document.getElementById('backToHome2').addEventListener('click', () => showPage('pageHome'));
 
-document.getElementById('backToListFromResults').addEventListener('click', () => {
-    showPage('pageList');
+// ━━━ QUICK ACTIONS ━━━
+document.getElementById('qaStart').addEventListener('click', () => {
+    if (state.tests.length === 0) {
+        showToast('Avval test yuklang');
+        return;
+    }
+    // Birinchi testni tanlash
+    const first = state.tests[0];
+    state.selectedTestId = first.id;
+    document.getElementById('selectedFileName').textContent = first.name;
+    document.getElementById('selectedFileMeta').textContent = `${first.questions} ta savol mavjud`;
+    document.getElementById('startTestBtn').disabled = false;
+    showPage('pageCount');
+});
+document.getElementById('qaUpload').addEventListener('click', () => {
+    showToast('Botga .txt, .docx yoki .doc fayl yuboring');
+});
+document.getElementById('qaResults').addEventListener('click', async () => {
+    if (!tgUserId) return;
+    try {
+        const resp = await fetch(`${API}/api/results/${tgUserId}`);
+        const data = await resp.json();
+        const results = data.results || [];
+        if (results.length === 0) {
+            showToast('Natijalar yoʻq');
+            return;
+        }
+        const text = results.slice(0, 5).map((r, i) => {
+            const emoji = r.score >= 80 ? '🌟' : r.score >= 60 ? '👍' : r.score >= 40 ? '📚' : '💪';
+            return `${emoji} ${r.file_name}: ${r.score}%`;
+        }).join('\n');
+        showToast(text);
+    } catch (e) { console.error(e); }
+});
+document.getElementById('qaHelp').addEventListener('click', () => {
+    showToast('Botga fayl yuboring → test avtomatik saqlanadi → bu yerda test boshlang');
 });
 
 // ━━━ START ━━━
