@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: test-bot
+    env: python
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: gunicorn main:app --worker-class sync --workers 1 --timeout 120
+    envVars:
+      - key: TOKEN
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    plan: free
