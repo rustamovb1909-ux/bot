@@ -1,6 +1,6 @@
 python-telegram-bot==21.10
 Flask==3.1.1
-pythoncom
+pythoncom ==26.1.2
 mammoth==1.9.0
 python-docx==1.2.0
 beautifulsoup4==4.13.4
