@@ -1,1 +1,24 @@
+version: '3.8'
 
+services:
+  test-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: test-bot
+    ports:
+      - "10000:10000"
+    environment:
+      - TOKEN=${TOKEN}
+      - WEBAPP_URL=${WEBAPP_URL}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./uploads:/app/uploads
+      - ./test_bot.db:/app/test_bot.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
