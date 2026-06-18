@@ -747,6 +747,7 @@ const state = {
     seconds: 0,
     isFinished: false,
     isLocked: false,
+    autoAdvanceTimeout: null,   // 🟢 YANGI: avtomatik o‘tish taymeri
 };
 
 const API = window.location.origin;
@@ -1005,9 +1006,12 @@ function handleOptionClick(optEl, q) {
 
     console.log('Tanlangan:', i, 'To\'g\'ri:', q.correct, 'Matn:', q.options[i], '/ To\'g\'ri matn:', q.options[q.correct]);
 
-    setTimeout(() => {
-        if (state.currentIndex < state.questions.length - 1) {
+    // 🟢 AVVALGI TAYMERNI TO'XTATISH VA YANGISINI BOSHLASH
+    if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
+    state.autoAdvanceTimeout = setTimeout(() => {
+        if (state.currentIndex < state.questions.length - 1 && !state.isFinished) {
             state.currentIndex++;
+            state.isLocked = false;      // 🟢 KEYINGI SAVOL UCHUN QULFNI OCHISH
             renderQuestion();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -1051,6 +1055,8 @@ function renderNav() {
     document.querySelectorAll('.nav-btn').forEach(b => {
         b.addEventListener('click', () => {
             if (state.isFinished) return;
+            // 🟢 QO'LDA O'TISHDA AVTO-O'TISH TAYMERINI TO'XTATISH
+            if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
             state.currentIndex = parseInt(b.dataset.i);
             state.isLocked = false;
             renderQuestion();
@@ -1067,6 +1073,8 @@ function finishTest() {
     }
     state.isFinished = true;
     if (state.timerInterval) clearInterval(state.timerInterval);
+    // 🟢 TAYMERNI TO'XTATISH
+    if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
 
     let correct = 0, wrong = 0, skipped = 0;
     state.questions.forEach((q, i) => {
@@ -1125,12 +1133,16 @@ document.getElementById('finishTestBtn').addEventListener('click', finishTest);
 document.getElementById('exitTestBtn').addEventListener('click', () => {
     if (state.isFinished || confirm('Chiqmoqchimisiz? Javoblar saqlanmaydi.')) {
         if (state.timerInterval) clearInterval(state.timerInterval);
+        // 🟢 CHIQISHDA HAM TAYMERNI TO'XTATISH
+        if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
         state.isFinished = true;
         showPage('pageHome');
     }
 });
 document.getElementById('restartBtn').addEventListener('click', () => {
     if (state.timerInterval) clearInterval(state.timerInterval);
+    // 🟢 QAYTA BOSHLASHDA HAM TAYMERNI TO'XTATISH
+    if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
     state.isFinished = false;
     state.questions = [];
     state.answers = {};
