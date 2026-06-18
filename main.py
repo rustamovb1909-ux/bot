@@ -12,7 +12,7 @@ from threading import Thread
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, MenuButtonWebApp
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, filters, ContextTypes
@@ -22,10 +22,12 @@ from bs4 import BeautifulSoup
 
 # ==================== KONFIGURATSIYA ====================
 TOKEN = os.getenv("TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-app.onrender.com")
+WEBAPP_URL = os.getenv("WEBAPP_URL")
 
 if not TOKEN:
     raise ValueError("TOKEN muhit o'zgaruvchisi o'rnatilmagan!")
+if not WEBAPP_URL:
+    raise ValueError("WEBAPP_URL muhit o'zgaruvchisi o'rnatilmagan!")
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
@@ -36,7 +38,6 @@ DB_PATH = "test_bot.db"
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-
     c.execute('''CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
         username TEXT,
@@ -45,7 +46,6 @@ def init_db():
         phone_number TEXT,
         registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
-
     c.execute('''CREATE TABLE IF NOT EXISTS files (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
@@ -56,7 +56,6 @@ def init_db():
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(user_id)
     )''')
-
     c.execute('''CREATE TABLE IF NOT EXISTS test_questions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file_id INTEGER,
@@ -68,7 +67,6 @@ def init_db():
         correct_answer TEXT,
         FOREIGN KEY (file_id) REFERENCES files(id)
     )''')
-
     c.execute('''CREATE TABLE IF NOT EXISTS test_results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
@@ -82,13 +80,11 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(user_id),
         FOREIGN KEY (file_id) REFERENCES files(id)
     )''')
-
     c.execute('''CREATE TABLE IF NOT EXISTS user_settings (
         user_id INTEGER PRIMARY KEY,
         default_test_count INTEGER DEFAULT 10,
         FOREIGN KEY (user_id) REFERENCES users(user_id)
     )''')
-
     conn.commit()
     conn.close()
     print("✅ Database initialized")
@@ -107,17 +103,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     conn = get_db()
     c = conn.cursor()
-    # Telefon raqamni tekshiramiz, agar mavjud bo'lsa saqlaymiz (contact orqali keladi)
     c.execute('''INSERT OR IGNORE INTO users (user_id, username, first_name, last_name)
                  VALUES (?, ?, ?, ?)''',
               (user.id, user.username, user.first_name, user.last_name))
     conn.commit()
     conn.close()
 
-    # Telefon raqam so‘rash tugmasi
     keyboard = [
         [InlineKeyboardButton("📱 Telefon raqamni ulashish", request_contact=True)],
-        [InlineKeyboardButton("🌐 Web App ni ochish", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
+        [InlineKeyboardButton("🌐 Imtihon platformasiga o‘tish", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
         [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
         [InlineKeyboardButton("📊 Mening testlarim", callback_data="my_tests")],
         [InlineKeyboardButton("📈 Natijalarim", callback_data="my_results")],
@@ -126,42 +120,47 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        f"👋 Assalomu alaykum, {user.first_name}!\n\n"
-        "Men test tizimi botiman. Iltimos, telefon raqamingizni ulashing (pastdagi tugma).\n\n"
-        "So‘ngra test fayllarni yuklab, ular ustida test topshirishingiz mumkin.",
+        f"👋 *Imtihon platformasi*\n\n"
+        f"Assalomu alaykum, {user.first_name}!\n"
+        "Bu yerda siz test fayllarni yuklab, imtihon topshirishingiz mumkin.\n\n"
+        "📌 Quyidagi tugma orqali web app ga o‘ting yoki fayl yuklang.",
+        parse_mode="Markdown",
         reply_markup=reply_markup
     )
 
-# Telefon raqamni qabul qilish
-async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    contact = update.message.contact
-    user_id = update.effective_user.id
-    if contact:
-        phone = contact.phone_number
-        conn = get_db()
-        c = conn.cursor()
-        c.execute('UPDATE users SET phone_number = ? WHERE user_id = ?', (phone, user_id))
-        conn.commit()
-        conn.close()
-        await update.message.reply_text("✅ Telefon raqamingiz saqlandi. Endi test fayl yuklashingiz mumkin.")
-    else:
-        await update.message.reply_text("❌ Iltimos, telefon raqamni ulashing.")
+    await context.bot.set_chat_menu_button(
+        chat_id=update.effective_user.id,
+        menu_button=MenuButtonWebApp(
+            text="Imtihon platformasi",
+            web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/'))
+        )
+    )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📖 *Yordam*\n\n"
-        "1. 'Test fayl yuklash' – test faylini yuklang (TXT, DOCX)\n"
+        "1. 'Test fayl yuklash' – test faylini yuboring (TXT, DOCX, DOC)\n"
         "2. Yuklangan fayldan test boshlash mumkin\n"
-        "3. Natijalar saqlanadi va istalgan vaqt ko‘rish mumkin\n\n"
-        "📁 Qo‘llab-quvvatlanadigan formatlar: TXT, DOCX\n"
-        "⚠️ .DOC formatni bot avtomatik .DOCX ga o‘tkazadi.",
+        "3. Natijalar saqlanadi va istalgan vaqt ko‘rish mumkin",
         parse_mode="Markdown"
     )
+
+async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    contact = update.message.contact
+    if contact:
+        phone = contact.phone_number
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('UPDATE users SET phone_number = ? WHERE user_id = ?', (phone, update.effective_user.id))
+        conn.commit()
+        conn.close()
+        await update.message.reply_text("✅ Telefon raqam saqlandi!")
+    else:
+        await update.message.reply_text("❌ Telefon raqam ulashilmadi.")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     data = query.data
 
     if data == "upload_file":
@@ -209,10 +208,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "finish_test":
         await finish_test(query, context)
 
-
 async def show_main_menu(query):
     keyboard = [
-        [InlineKeyboardButton("🌐 Web App", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
+        [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
         [InlineKeyboardButton("📤 Yuklash", callback_data="upload_file")],
         [InlineKeyboardButton("📊 Mening testlarim", callback_data="my_tests")],
         [InlineKeyboardButton("📈 Natijalarim", callback_data="my_results")],
@@ -224,7 +222,6 @@ async def show_main_menu(query):
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
-
 
 async def show_user_tests(query):
     user_id = query.from_user.id
@@ -254,7 +251,6 @@ async def show_user_tests(query):
     keyboard.append([InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")])
     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
-
 async def show_user_results(query):
     user_id = query.from_user.id
     conn = get_db()
@@ -283,7 +279,6 @@ async def show_user_results(query):
         text += f"   ✅ {r['correct_answers']} | ❌ {r['wrong_answers']} | ⏭️ {r['skipped_answers']}\n"
         text += f"   📊 Ball: {r['score']}%\n\n"
     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
 
 async def start_test(query, context, file_id):
     user_id = query.from_user.id
@@ -315,7 +310,6 @@ async def start_test(query, context, file_id):
 
     await show_question(query, context)
 
-
 async def show_question(query, context):
     questions = context.user_data.get('test_questions', [])
     current = context.user_data.get('test_current', 0)
@@ -346,7 +340,6 @@ async def show_question(query, context):
 
     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
-
 async def handle_answer(query, context, data):
     letter = data.split("_")[1]
     current = context.user_data.get('test_current', 0)
@@ -364,7 +357,6 @@ async def handle_answer(query, context, data):
         context.user_data['test_current'] = current + 1
 
         await show_question(query, context)
-
 
 async def finish_test(query, context):
     correct = context.user_data.get('test_correct', 0)
@@ -408,7 +400,6 @@ async def finish_test(query, context):
     keyboard = [[InlineKeyboardButton("🔙 Asosiy menyu", callback_data="back_to_main")]]
     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
-
 async def delete_file(query, file_id):
     user_id = query.from_user.id
     conn = get_db()
@@ -427,8 +418,7 @@ async def delete_file(query, file_id):
     await query.answer("✅ Fayl o'chirildi")
     await show_user_tests(query)
 
-
-# ==================== FILE HANDLING (with .doc conversion) ====================
+# ==================== FILE HANDLING ====================
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get('waiting_for_file'):
@@ -446,44 +436,36 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     processing_msg = await update.message.reply_text("⏳ Fayl qayta ishlanmoqda...")
 
-    # Yuklab olish
     file = await context.bot.get_file(document.file_id)
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
         await file.download_to_drive(tmp_file.name)
         tmp_path = tmp_file.name
 
     try:
-        # Agar .doc bo‘lsa, .docx ga o‘tkazamiz
         if ext == '.doc':
             await processing_msg.edit_text("🔄 .DOC ni .DOCX ga o‘tkazish...")
             docx_path = await convert_doc_to_docx(tmp_path)
             if docx_path:
-                # Yangi faylni o'qish
                 with open(docx_path, 'rb') as f:
                     result = mammoth.convert_to_html(f)
                     html = result.value
                 questions = parse_html_content(html)
-                # Eski faylni o'chirish
                 os.unlink(tmp_path)
                 tmp_path = docx_path
-                # Yangi nom
                 file_name = file_name.replace('.doc', '.docx')
             else:
                 await processing_msg.edit_text(
                     "❌ .DOC ni .DOCX ga o‘tkazib bo‘lmadi.\n"
-                    "Iltimos, faylni o‘zingiz Microsoft Word yoki LibreOffice da ochib, "
-                    "‘Saqlash, nomi bilan’ → .DOCX formatda saqlang va qayta yuboring."
+                    "Iltimos, faylni o‘zingiz .DOCX ga o‘tkazib qayta yuboring."
                 )
                 os.unlink(tmp_path)
                 return
 
-        # Endi .txt yoki .docx
         if ext == '.txt':
             with open(tmp_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             questions = parse_text_content(content)
-        else:  # .docx
-            # Agar hali o'qilmagan bo'lsa (docx bo'lsa)
+        else:
             if ext != '.doc':
                 with open(tmp_path, 'rb') as f:
                     result = mammoth.convert_to_html(f)
@@ -498,7 +480,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.unlink(tmp_path)
             return
 
-        # Saqlash
         upload_dir = Path("uploads")
         upload_dir.mkdir(exist_ok=True)
 
@@ -542,28 +523,19 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-
 async def convert_doc_to_docx(doc_path):
-    """LibreOffice yordamida .doc -> .docx konvertatsiya"""
     try:
         out_dir = tempfile.mkdtemp()
-        # LibreOffice headless
-        cmd = [
-            'libreoffice', '--headless', '--convert-to', 'docx',
-            '--outdir', out_dir, doc_path
-        ]
+        cmd = ['libreoffice', '--headless', '--convert-to', 'docx', '--outdir', out_dir, doc_path]
         subprocess.run(cmd, check=True, timeout=60, capture_output=True)
-        # Yangi fayl nomini topish
         base = os.path.basename(doc_path).replace('.doc', '.docx')
         docx_path = os.path.join(out_dir, base)
         if os.path.exists(docx_path):
             return docx_path
-        else:
-            return None
+        return None
     except Exception as e:
         print(f"Conversion error: {e}")
         return None
-
 
 # ==================== PARSERS ====================
 
@@ -625,7 +597,6 @@ def parse_html_content(html):
         questions = parse_text_content(text)
     return questions
 
-
 # ==================== FLASK ROUTES ====================
 
 @app.route('/')
@@ -642,8 +613,7 @@ def get_user_files(user_id):
                              FROM files WHERE user_id = ? ORDER BY uploaded_at DESC''',
                           (user_id,)).fetchall()
         conn.close()
-        result = [dict(f) for f in files]
-        return jsonify({'files': result})
+        return jsonify({'files': [dict(f) for f in files]})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -659,8 +629,7 @@ def get_user_results(user_id):
                               ORDER BY tr.test_date DESC''',
                            (user_id,)).fetchall()
         conn.close()
-        result = [dict(r) for r in results]
-        return jsonify({'results': result})
+        return jsonify({'results': [dict(r) for r in results]})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -674,7 +643,6 @@ def webhook():
             bot_loop
         )
     return "ok", 200
-
 
 # ==================== BOT SETUP ====================
 
@@ -698,18 +666,28 @@ def run_bot():
         await bot_app.initialize()
         webhook_url = WEBAPP_URL.rstrip('/') + '/webhook'
         await bot_app.bot.set_webhook(webhook_url)
+
+        await bot_app.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text="Imtihon platformasi",
+                web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/'))
+            )
+        )
+
         await bot_app.start()
-        print(f"✅ Webhook o'rnatildi: {webhook_url}")
+        print(f"✅ Webhook: {webhook_url}")
+        print("✅ MenuButtonWebApp o'rnatildi")
 
     bot_loop.run_until_complete(setup())
     bot_loop.run_forever()
-
 
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
     if not TOKEN:
         raise ValueError("TOKEN muhit o'zgaruvchisi o'rnatilmagan!")
+    if not WEBAPP_URL:
+        raise ValueError("WEBAPP_URL muhit o'zgaruvchisi o'rnatilmagan!")
 
     bot_thread = Thread(target=run_bot, daemon=True)
     bot_thread.start()
