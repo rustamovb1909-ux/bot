@@ -901,20 +901,15 @@ document.getElementById('startTestBtn').addEventListener('click', async () => {
     }
 
     const shuffledQuestions = shuffle(allQuestions).map(q => {
-        // q.correct — to'g'ri javob indeksi (serverdan keladi)
-        const correctIdx = q.correct;
-        const correctText = q.options[correctIdx];
-        // Variantlarni aralashtiramiz, lekin bo'sh variantlarni olib tashlaymiz
+        const correctText = q.correct_text || q.options[q.correct];
         const realOptions = q.options.filter(o => o && o.trim());
         const shuffledOpts = shuffle(realOptions);
-        // Yangi indeksni topamiz — matn bo'yicha
         let newCorrect = shuffledOpts.indexOf(correctText);
         if (newCorrect === -1) {
-            // Topilmasa, asl indeksni ishlatamiz
-            newCorrect = Math.min(correctIdx, shuffledOpts.length - 1);
+            // Matn bo'yicha topilmasa, eski indeksni ishlatamiz
+            newCorrect = Math.min(q.correct || 0, shuffledOpts.length - 1);
             if (newCorrect < 0) newCorrect = 0;
         }
-        // 4 tagacha to'ldiramiz
         while (shuffledOpts.length < 4) shuffledOpts.push('');
         return {
             text: q.text,
@@ -1008,13 +1003,15 @@ function handleOptionClick(optEl, q) {
     lockOptions(q, i);
     renderNav();
 
+    console.log('Tanlangan:', i, 'To\'g\'ri:', q.correct, 'Matn:', q.options[i], '/ To\'g\'ri matn:', q.options[q.correct]);
+
     setTimeout(() => {
         if (state.currentIndex < state.questions.length - 1) {
             state.currentIndex++;
             renderQuestion();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-    }, 700);
+    }, 900);
 }
 
 function lockOptions(q, selectedIdx) {
