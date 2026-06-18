@@ -53,9 +53,11 @@ DB_PATH = os.getenv("DB_PATH", "test_bot.db")
 # MA'LUMOTLAR BAZASI
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def init_db():
-    """Bazani yaratish"""
+    """Bazani yaratish va migratsiya"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+
+    # Yangi jadvallarni yaratamiz
     c.executescript('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -100,6 +102,21 @@ def init_db():
             FOREIGN KEY (file_id) REFERENCES files(id)
         );
     ''')
+
+    # Migratsiya: eski users jadvalida phone_number ustuni bo'lmasa, qo'shamiz
+    c.execute("PRAGMA table_info(users)")
+    cols = [row[1] for row in c.fetchall()]
+    if 'phone_number' not in cols:
+        try:
+            c.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
+            print("phone_number ustuni qo'shildi", flush=True)
+        except Exception as e:
+            print(f"Migratsiya xatosi: {e}", flush=True)
+
+    # users jadvali uchun indeks
+    c.execute("CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id)")
+
     conn.commit()
     conn.close()
 
@@ -187,7 +204,7 @@ def parse_text_content(text):
     """
     Matndan savollarni ajratish. Qo'llab-quvvatlanadigan formatlar:
 
-    FORMAT 1 — 5 ta ustunli (| bilan):
+    FORMAT 1 — 5 ta ustunli (| yoki tab yoki vergul bilan):
         Savol|To'g'ri|Xato1|Xato2|Xato3
 
     FORMAT 2 — Birinchi variant to'g'ri (- bilan):
@@ -218,18 +235,19 @@ def parse_text_content(text):
     lines = [normalize_text(l) for l in lines if normalize_text(l)]
     questions = []
 
-    # FORMAT 1: 5 ta ustunli (| yoki tab)
+    # FORMAT 1: 5 ta ustunli (|, \t, yoki ; bilan ajratilgan)
     format1_found = False
     for line in lines:
-        if '|' in line:
-            parts = [normalize_text(p) for p in line.split('|')]
-            parts = [p for p in parts if p]
-        elif '\t' in line:
-            parts = [normalize_text(p) for p in line.split('\t')]
-            parts = [p for p in parts if p]
-        else:
+        parts = None
+        for sep in ['|', '\t', ';']:
+            if sep in line:
+                raw = [normalize_text(p) for p in line.split(sep)]
+                raw = [p for p in raw if p]
+                if len(raw) >= 5:
+                    parts = raw
+                    break
+        if not parts:
             continue
-
         if len(parts) >= 5:
             q_text, correct = parts[0], parts[1]
             wrong = parts[2:5]
@@ -370,18 +388,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         return
 
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        'INSERT OR IGNORE INTO users (user_id, username, first_name, last_name) VALUES (?, ?, ?, ?)',
-        (user.id, user.username, user.first_name, user.last_name),
-    )
-    conn.commit()
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(
+            'INSERT OR IGNORE INTO users (user_id, username, first_name, last_name) VALUES (?, ?, ?, ?)',
+            (user.id, user.username, user.first_name, user.last_name),
+        )
+        conn.commit()
 
-    row = c.execute('SELECT phone_number FROM users WHERE user_id = ?', (user.id,)).fetchone()
-    conn.close()
+        row = c.execute('SELECT phone_number FROM users WHERE user_id = ?', (user.id,)).fetchone()
+        phone = (row['phone_number'] if row else None) or ''
+        conn.close()
+    except Exception as e:
+        print(f"start DB error: {e}", flush=True)
+        phone = None
 
-    if not row or not row['phone_number']:
+    if not phone:
         # Telefon raqam so'raymiz
         kb = ReplyKeyboardMarkup(
             [[KeyboardButton("📱 Telefon raqamni ulashish", request_contact=True)]],
@@ -441,16 +464,32 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     phone = contact.phone_number
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('UPDATE users SET phone_number = ? WHERE user_id = ?', (phone, user.id))
-    conn.commit()
-    conn.close()
+
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        # Avval user borligini tekshiramiz
+        c.execute('SELECT 1 FROM users WHERE user_id = ?', (user.id,))
+        exists = c.fetchone()
+        if exists:
+            c.execute('UPDATE users SET phone_number = ? WHERE user_id = ?', (phone, user.id))
+        else:
+            c.execute(
+                'INSERT INTO users (user_id, username, first_name, last_name, phone_number) VALUES (?, ?, ?, ?, ?)',
+                (user.id, user.username, user.first_name, user.last_name, phone),
+            )
+        conn.commit()
+        conn.close()
+        print(f"Telefon raqam saqlandi: user={user.id}, phone={phone}", flush=True)
+    except Exception as e:
+        print(f"contact_handler DB error: {e}", flush=True)
+        await update.message.reply_text("❌ Telefon raqamni saqlashda xatolik. Qayta urinib ko'ring.")
+        return
 
     # Reply keyboardni olib tashlaymiz
     remove_kb = ReplyKeyboardMarkup([[]], resize_keyboard=True)
     await update.message.reply_text(
-        f"✅ Telefon raqam saqlandi: `{phone}`",
+        f"✅ Telefon raqam saqlandi: `{phone}`\n\nEndi botdan to'liq foydalanishingiz mumkin!",
         parse_mode="Markdown",
         reply_markup=remove_kb,
     )
@@ -820,23 +859,36 @@ def api_test_questions(file_id):
 
         questions = []
         for r in rows:
-            opts = [r['option_a'], r['option_b'], r['option_c'], r['option_d']]
-            opts = [o for o in opts if o and o.strip()]
-            if len(opts) < 2:
+            opts = [r['option_a'] or '', r['option_b'] or '', r['option_c'] or '', r['option_d'] or '']
+            # Bo'sh variantlarni olib tashlaymiz, lekin original indekslarni saqlaymiz
+            non_empty = [(i, o) for i, o in enumerate(opts) if o and o.strip()]
+            if len(non_empty) < 2:
                 continue
             correct_letter = (r['correct_answer'] or 'A').strip().upper()
             try:
-                correct_idx = ord(correct_letter[0]) - ord('A')
+                original_correct_idx = ord(correct_letter[0]) - ord('A')
             except (TypeError, ValueError, IndexError):
-                correct_idx = 0
-            if correct_idx >= len(opts) or correct_idx < 0:
-                correct_idx = 0
-            # 'correct' — variant indeksi (0-3), matni emas
-            # Bu webapp'da variantlar aralashtirilganda ham to'g'ri ishlaydi
+                original_correct_idx = 0
+            if original_correct_idx < 0 or original_correct_idx > 3:
+                original_correct_idx = 0
+            # Yangi siqilgan ro'yxatda to'g'ri javobning indeksini topamiz
+            new_correct_idx = None
+            correct_text = None
+            for new_idx, (orig_idx, txt) in enumerate(non_empty):
+                if orig_idx == original_correct_idx:
+                    new_correct_idx = new_idx
+                    correct_text = txt
+                    break
+            if new_correct_idx is None:
+                # To'g'ri javob ro'yxatda yo'q — birinchi variantni olamiz
+                new_correct_idx = 0
+                correct_text = non_empty[0][1]
+            cleaned_opts = [txt for _, txt in non_empty]
             questions.append({
                 'text': r['question_text'],
-                'options': opts,
-                'correct': correct_idx,
+                'options': cleaned_opts,
+                'correct': new_correct_idx,
+                'correct_text': correct_text,  # Aralashtirish uchun zaxira matn
             })
         return jsonify({'questions': questions})
     except Exception as e:
