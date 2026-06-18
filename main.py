@@ -690,13 +690,17 @@ def run_bot():
 
     async def setup():
         await bot_app.initialize()
+
+        print("WEBHOOK_URL =", WEBHOOK_URL)
+
         webhook_url = WEBHOOK_URL.rstrip('/') + '/webhook'
         await bot_app.bot.set_webhook(webhook_url)
+
         await bot_app.start()
         print(f"✅ Webhook o'rnatildi: {webhook_url}")
 
-    bot_loop.run_until_complete(setup())
-    bot_loop.run_forever()
+        bot_loop.run_until_complete(setup())
+        bot_loop.run_forever()
 
 
 # ==================== MAIN ====================
