@@ -441,57 +441,87 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== PARSERS ====================
 
 def parse_text_content(text):
-    """Matndan savollarni ajratish"""
+    """Matndan savollarni ajratish
+    Format 1: Har bir qatorda 5 ta bo'lim | yoki ; yoki tab bilan ajratilgan
+    [Savol | To'g'ri javob | Xato 1 | Xato 2 | Xato 3]
+    Format 2: Savol matni yangi qatorda, keyin A) B) C) D) variantlar
+    """
     lines = [l.strip() for l in text.strip().split('\n') if l.strip()]
     questions = []
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        # Savol ehtimoli: "?" bor yoki uzun matn
-        is_q = '?' in line or (len(line) > 30 and not line[0].isdigit() == False)
-        # Raqam bilan boshlangan savollar: "1. Savol matni..."
-        if line and (line[0].isdigit() and ('.' in line[:5] or ')' in line[:5])):
-            # "1. Savol matni" yoki "1) Savol matni" formatda
-            parts = line.split(maxsplit=1)
-            if len(parts) == 2 and len(parts[1]) > 5:
-                line = parts[1]
-                is_q = True
 
-        if is_q:
-            q_text = line.lstrip('0123456789.-) ').strip()
-            options = []
-            j = i + 1
-            while j < len(lines) and len(options) < 4:
-                opt = lines[j]
-                # A) variant matni
-                if opt and len(opt) > 2 and opt[0].upper() in 'ABCD' and opt[1] in ').':
-                    clean = opt[2:].strip() if len(opt) > 2 else ''
-                    if clean:
-                        options.append(clean)
-                # Oddiy variant (harf bilan boshlanmagan)
-                elif opt and len(options) < 4 and not opt[0].isdigit():
-                    options.append(opt)
-                j += 1
-                if len(options) >= 4:
-                    break
-            if len(options) >= 2:
+    # Avval 5-ustunli formatni tekshiramiz
+    for line in lines:
+        # | yoki ; yoki tab bilan ajratilgan
+        if '|' in line:
+            parts = [p.strip() for p in line.split('|') if p.strip()]
+        elif '\t' in line:
+            parts = [p.strip() for p in line.split('\t') if p.strip()]
+        else:
+            continue
+
+        if len(parts) >= 5:
+            q_text = parts[0]
+            correct = parts[1]
+            wrong_options = parts[2:5]
+            if q_text and correct:
+                all_options = [correct] + wrong_options
+                while len(all_options) < 4:
+                    all_options.append('')
                 questions.append({
                     'text': q_text,
-                    'options': options[:4],
+                    'options': all_options[:4],
                     'correct': 'A'
                 })
-                i = j
-                continue
-        i += 1
+
+    # Agar jadval formatida topmasa, klassik A) B) C) D) formatini sinab ko'ramiz
+    if not questions:
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            is_q = '?' in line or (len(line) > 30 and not line[0].isdigit() == False)
+            if line and (line[0].isdigit() and ('.' in line[:5] or ')' in line[:5])):
+                parts = line.split(maxsplit=1)
+                if len(parts) == 2 and len(parts[1]) > 5:
+                    line = parts[1]
+                    is_q = True
+
+            if is_q:
+                q_text = line.lstrip('0123456789.-) ').strip()
+                options = []
+                j = i + 1
+                while j < len(lines) and len(options) < 4:
+                    opt = lines[j]
+                    if opt and len(opt) > 2 and opt[0].upper() in 'ABCD' and opt[1] in ').':
+                        clean = opt[2:].strip() if len(opt) > 2 else ''
+                        if clean:
+                            options.append(clean)
+                    elif opt and len(options) < 4 and not opt[0].isdigit():
+                        options.append(opt)
+                    j += 1
+                    if len(options) >= 4:
+                        break
+                if len(options) >= 2:
+                    questions.append({
+                        'text': q_text,
+                        'options': options[:4],
+                        'correct': 'A'
+                    })
+                    i = j
+                    continue
+            i += 1
+
     return questions
 
 
 def parse_html_content(html):
-    """DOCX dan olingan HTML dan savollarni ajratish"""
+    """DOCX dan olingan HTML dan savollarni ajratish
+    Format: 5 ta ustunli jadval
+    [Savol matni | To'g'ri javob | Xato 1 | Xato 2 | Xato 3]
+    """
     soup = BeautifulSoup(html, 'html.parser')
     questions = []
 
-    # Avval jadvallarni tekshiramiz
+    # Jadvallarni tekshiramiz
     tables = soup.find_all('table')
     for table in tables:
         rows = table.find_all('tr')
@@ -499,24 +529,23 @@ def parse_html_content(html):
             cells = row.find_all(['td', 'th'])
             if len(cells) >= 5:
                 q_text = cells[0].get_text().strip()
-                opts = []
-                for i in range(1, min(5, len(cells))):
+                correct = cells[1].get_text().strip()
+                wrong = []
+                for i in range(2, min(5, len(cells))):
                     txt = cells[i].get_text().strip()
                     if txt:
-                        # "A) variant" yoki "A. variant" formatini tozalash
-                        clean = txt
-                        if len(clean) > 2 and clean[0].upper() in 'ABCD' and clean[1] in ').':
-                            clean = clean[2:].strip()
-                        if clean:
-                            opts.append(clean)
-                if len(opts) >= 2 and q_text:
-                    # 4 ta variantga to'ldiramiz
-                    while len(opts) < 4:
-                        opts.append('')
+                        wrong.append(txt)
+
+                if q_text and correct and len(wrong) >= 1:
+                    # To'g'ri javob + xato javoblar = barcha variantlar
+                    all_options = [correct] + wrong[:3]
+                    # 4 tagacha to'ldiramiz
+                    while len(all_options) < 4:
+                        all_options.append('')
                     questions.append({
                         'text': q_text,
-                        'options': opts[:4],
-                        'correct': 'A'
+                        'options': all_options[:4],
+                        'correct': 'A'  # To'g'ri javob 1-o'rinda (A)
                     })
 
     if not questions:
