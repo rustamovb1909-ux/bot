@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 
 # ==================== KONFIGURATSIYA ====================
 TOKEN = os.getenv("TOKEN")
-WEBHOOK_URL = os.getenv("WEBAPP_URL", "https://YOUR_DOMAIN")  # /webhook avtomatik qo'shiladi
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # /webhook avtomatik qo'shiladi
 
 app = Flask(__name__)
 
@@ -681,11 +681,9 @@ def run_bot():
 
     bot_app = Application.builder().token(TOKEN).build()
 
-    # Handlers
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CommandHandler("help", help_command))
     bot_app.add_handler(MessageHandler(filters.Document.ALL, handle_file))
-    # Barcha callback querylarni bitta handler orqali boshqaramiz
     bot_app.add_handler(CallbackQueryHandler(button_handler))
 
     async def setup():
@@ -699,10 +697,8 @@ def run_bot():
         await bot_app.start()
         print(f"✅ Webhook o'rnatildi: {webhook_url}")
 
-        bot_loop.run_until_complete(setup())
-        bot_loop.run_forever()
-
-
+    bot_loop.run_until_complete(setup())
+    bot_loop.run_forever()
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
