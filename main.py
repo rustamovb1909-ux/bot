@@ -751,7 +751,11 @@ async def main():
         
         # Signal handler xatosini oldini olish uchun
         # Aiogram 3 da polling uchun skip_updates=True va signal handlersiz
-        await dp.start_polling(bot, skip_updates=True)
+        await dp.start_polling(
+    bot,
+    skip_updates=True,
+    handle_signals=False
+)
     except Exception as e:
         print(f"❌ Bot xatosi: {e}")
         raise
