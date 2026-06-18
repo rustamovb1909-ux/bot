@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 
 # ==================== KONFIGURATSIYA ====================
 TOKEN = os.getenv("TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # /webhook avtomatik qo'shiladi
+WEBHOOK_URL = "https://bot-gujm.onrender.com"  # /webhook avtomatik qo'shiladi
 
 app = Flask(__name__)
 
