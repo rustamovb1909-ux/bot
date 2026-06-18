@@ -47,7 +47,22 @@ if not TOKEN:
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-DB_PATH = os.getenv("DB_PATH", "test_bot.db")
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# DOIMIY DISK (Render.com uchun)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Render.com'da persistent disk /var/data ga mount qilinadi
+# Agar mavjud bo'lmasa, hozirgi ishchi katalogni ishlatamiz
+DATA_DIR = os.getenv("DATA_DIR", "/var/data" if os.path.isdir("/var/data") else ".")
+DATA_DIR = Path(DATA_DIR)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DB_PATH = os.getenv("DB_PATH", str(DATA_DIR / "test_bot.db"))
+UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(DATA_DIR / "uploads")))
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+print(f"DATA_DIR: {DATA_DIR}", flush=True)
+print(f"DB_PATH: {DB_PATH}", flush=True)
+print(f"UPLOADS_DIR: {UPLOADS_DIR}", flush=True)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # MA'LUMOTLAR BAZASI
@@ -763,8 +778,8 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         # Faylni saqlash
-        upload_dir = Path("uploads")
-        upload_dir.mkdir(exist_ok=True)
+        upload_dir = UPLOADS_DIR
+        upload_dir.mkdir(parents=True, exist_ok=True)
 
         save_name = file_name[:-4] + '.docx' if ext == '.doc' else file_name
         unique_name = f"{update.effective_user.id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{save_name}"
