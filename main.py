@@ -382,6 +382,25 @@ def parse_html_content(html):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # TELEGRAM BOT HANDLERLARI
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def md_escape(text):
+    """Foydalanuvchi matnidan Markdown uchun xavfli belgilarni olib tashlash"""
+    if not text:
+        return ''
+    bad_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '|', '{', '}']
+    for ch in bad_chars:
+        text = text.replace(ch, ' ')
+    return text
+
+
+def html_escape(text):
+    """HTML uchun xavfli belgilarni escape qilish"""
+    if not text:
+        return ''
+    text = str(text)
+    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    return text
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/start — telefon raqam so'rash yoki asosiy menyu"""
     user = update.effective_user
@@ -411,11 +430,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resize_keyboard=True,
             one_time_keyboard=True,
         )
+        safe_name = html_escape(user.first_name or 'foydalanuvchi')
         await update.message.reply_text(
-            f"👋 Assalomu alaykum, *{user.first_name}*!\n\n"
+            f"👋 Assalomu alaykum, <b>{safe_name}</b>!\n\n"
             "📌 Imtihon platformasidan foydalanish uchun avval telefon raqamingizni ulashing.\n\n"
             "Quyidagi tugmani bosing:",
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=kb,
         )
     else:
@@ -424,6 +444,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def send_main_menu(update, first_name):
     """Asosiy menyu — tugmalar"""
+    safe_name = html_escape(first_name or 'foydalanuvchi')
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
         [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
@@ -432,22 +453,22 @@ async def send_main_menu(update, first_name):
         [InlineKeyboardButton("💡 Yordam", callback_data="help")],
     ])
     await update.message.reply_text(
-        f"✅ Xush kelibsiz, *{first_name}*!\n\nQuyidagilardan birini tanlang:",
-        parse_mode="Markdown",
+        f"✅ Xush kelibsiz, <b>{safe_name}</b>!\n\nQuyidagilardan birini tanlang:",
+        parse_mode="HTML",
         reply_markup=kb,
     )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📖 *Yordam*\n\n"
-        "1️⃣ *Test yuklash*: botga `.txt`, `.docx` yoki `.doc` fayl yuboring\n"
-        "2️⃣ `.doc` fayl avtomatik `.docx` ga o'tkaziladi\n"
+        "📖 <b>Yordam</b>\n\n"
+        "1️⃣ <b>Test yuklash</b>: botga <code>.txt</code>, <code>.docx</code> yoki <code>.doc</code> fayl yuboring\n"
+        "2️⃣ <code>.doc</code> fayl avtomatik <code>.docx</code> ga o'tkaziladi\n"
         "3️⃣ Test natijalari saqlanadi va istalgan vaqt ko'riladi\n\n"
-        "📋 *Test formati:*\n"
+        "📋 <b>Test formati:</b>\n"
         "• 5 ta ustunli jadval (Word yoki Excel)\n"
-        "• Yoki matn ko'rinishida (`-` belgi bilan)",
-        parse_mode="Markdown",
+        "• Yoki matn ko'rinishida (<code>-</code> belgi bilan)",
+        parse_mode="HTML",
     )
 
 
@@ -489,8 +510,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Reply keyboardni olib tashlaymiz
     remove_kb = ReplyKeyboardMarkup([[]], resize_keyboard=True)
     await update.message.reply_text(
-        f"✅ Telefon raqam saqlandi: `{phone}`\n\nEndi botdan to'liq foydalanishingiz mumkin!",
-        parse_mode="Markdown",
+        f"✅ Telefon raqam saqlandi: {phone}\n\nEndi botdan to'liq foydalanishingiz mumkin!",
         reply_markup=remove_kb,
     )
     await send_main_menu(update, user.first_name)
@@ -504,22 +524,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "upload_file":
         await query.edit_message_text(
-            "📤 *Test faylini yuboring*\n\n"
-            "✅ `.txt` — matn fayli\n"
-            "✅ `.docx` — zamonaviy Word formati\n"
-            "✅ `.doc` — eski format (avtomatik `.docx` ga o'tkaziladi)\n\n"
-            "📋 *Test formati:*\n"
+            "📤 <b>Test faylini yuboring</b>\n\n"
+            "✅ <code>.txt</code> — matn fayli\n"
+            "✅ <code>.docx</code> — zamonaviy Word formati\n"
+            "✅ <code>.doc</code> — eski format (avtomatik <code>.docx</code> ga o'tkaziladi)\n\n"
+            "📋 <b>Test formati:</b>\n"
             "Variant 1 (5 ta ustunli jadval):\n"
-            "`Savol|To'g'ri|Xato1|Xato2|Xato3`\n\n"
+            "<code>Savol|To'g'ri|Xato1|Xato2|Xato3</code>\n\n"
             "Variant 2 (matn ko'rinishida):\n"
-            "```\n"
+            "<pre>"
             "Menejment – bu\n"
             "- Boshqarish (to'g'ri)\n"
             "- Maqsadga intilish\n"
             "- Tasavvur\n"
-            "- Samarali boshqaruv\n"
-            "```",
-            parse_mode="Markdown",
+            "- Samarali boshqaruv"
+            "</pre>",
+            parse_mode="HTML",
         )
         context.user_data['waiting_for_file'] = True
 
@@ -531,12 +551,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "help":
         await query.edit_message_text(
-            "📖 *Yordam*\n\n"
-            "1️⃣ `.txt`, `.docx` yoki `.doc` fayl yuboring\n"
+            "📖 <b>Yordam</b>\n\n"
+            "1️⃣ <code>.txt</code>, <code>.docx</code> yoki <code>.doc</code> fayl yuboring\n"
             "2️⃣ Bot testlarni ajratib saqlaydi\n"
             "3️⃣ WebApp'da test topshiring\n"
             "4️⃣ Natijalar saqlanadi",
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔙 Orqaga", callback_data="back_to_main")
             ]]),
@@ -551,6 +571,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💡 Yordam", callback_data="help")],
         ])
         await query.edit_message_text("👋 Asosiy menyu:", reply_markup=kb)
+        # Xabarni edit qilgandan keyin yangi xabar yuborishimiz kerak emas,
+        # chunki edit_message_text o'rniga boshqa menyuga o'tkazamiz
 
 
 async def show_user_tests(query):
@@ -572,12 +594,13 @@ async def show_user_tests(query):
         await query.edit_message_text("📂 Siz hali hech qanday test yuklamagansiz.", reply_markup=kb_back)
         return
 
-    text = "📚 *Mening testlarim:*\n\n"
+    text = "📚 <b>Mening testlarim:</b>\n\n"
     for i, f in enumerate(files[:20], 1):
         date = (f['uploaded_at'] or '')[:10]
-        text += f"{i}. *{f['original_name']}* — {f['cnt']} ta savol\n   📅 {date}\n\n"
+        name = md_escape(f['original_name'] or 'Nomsiz')
+        text += f"{i}. <b>{name}</b> — {f['cnt']} ta savol\n   📅 {date}\n\n"
 
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=kb_back)
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb_back)
 
 
 async def show_user_results(query):
@@ -601,18 +624,19 @@ async def show_user_results(query):
         await query.edit_message_text("📊 Hali natijalar yo'q. Avval test topshiring.", reply_markup=kb_back)
         return
 
-    text = "📊 *Oxirgi 10 ta natija:*\n\n"
+    text = "📊 <b>Oxirgi 10 ta natija:</b>\n\n"
     for r in rows:
         date = (r['test_date'] or '')[:16]
         emoji = "🌟" if r['score'] >= 80 else "👍" if r['score'] >= 60 else "📚" if r['score'] >= 40 else "💪"
+        fname = md_escape(r['file_name'] or '')
         text += (
-            f"{emoji} *{r['file_name']}*\n"
+            f"{emoji} <b>{fname}</b>\n"
             f"   📅 {date}\n"
             f"   ✅ {r['correct_answers']} | ❌ {r['wrong_answers']} | ⏭️ {r['skipped_answers']}\n"
-            f"   📊 Ball: *{r['score']}%*\n\n"
+            f"   📊 Ball: <b>{r['score']}%</b>\n\n"
         )
 
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=kb_back)
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb_back)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -696,10 +720,10 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await processing_msg.edit_text(
                     "❌ .doc faylni .docx ga o'tkazib bo'lmadi.\n\n"
                     "Iltimos, faylni Microsoft Word yoki LibreOffice'da oching:\n"
-                    "1. *Fayl → Saqlash, nomi bilan*\n"
-                    "2. Format: *Word (.docx)*\n"
+                    "1. <b>Fayl → Saqlash, nomi bilan</b>\n"
+                    "2. Format: <b>Word (.docx)</b>\n"
                     "3. Saqlang va qayta yuboring",
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
@@ -724,17 +748,17 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not questions:
             await processing_msg.edit_text(
                 "❌ Fayldan savollar topilmadi.\n\n"
-                "*To'g'ri format:*\n"
+                "<b>To'g'ri format:</b>\n"
                 "1. 5 ta ustunli jadval (Word)\n"
                 "2. Yoki matn:\n"
-                "```\n"
+                "<pre>"
                 "Menejment – bu\n"
                 "- Boshqarish\n"
                 "- Maqsadga intilish\n"
                 "- Tasavvur\n"
-                "- Samarali boshqaruv\n"
-                "```",
-                parse_mode="Markdown",
+                "- Samarali boshqaruv"
+                "</pre>",
+                parse_mode="HTML",
             )
             return
 
@@ -783,11 +807,11 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
         await processing_msg.edit_text(
-            f"✅ *Fayl saqlandi!*\n\n"
-            f"📄 {save_name}\n"
+            f"✅ <b>Fayl saqlandi!</b>\n\n"
+            f"📄 {md_escape(save_name)}\n"
             f"📊 {len(questions)} ta savol topildi\n\n"
             f"Test topshirish uchun quyidagi tugmani bosing:",
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=kb,
         )
         context.user_data['waiting_for_file'] = False
@@ -796,7 +820,11 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"❌ handle_file error: {e}", flush=True)
         import traceback
         traceback.print_exc()
-        await processing_msg.edit_text(f"❌ Xatolik: {str(e)[:200]}")
+        safe_err = md_escape(str(e)[:200])
+        try:
+            await processing_msg.edit_text(f"❌ Xatolik: {safe_err}")
+        except Exception:
+            await processing_msg.edit_text(f"❌ Xatolik yuz berdi. Qayta urinib ko'ring.")
         for p in [tmp_path, converted_path]:
             if p and os.path.exists(p):
                 try:
