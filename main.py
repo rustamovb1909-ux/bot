@@ -6,7 +6,8 @@ import datetime
 import tempfile
 import shutil
 import random
-import requests
+import urllib.request
+import urllib.parse
 from pathlib import Path
 from threading import Thread
 from flask import Flask, request, jsonify, send_from_directory
@@ -137,7 +138,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     data = query.data
-    print(f"Callback data: {data}")  # Debug uchun
+    print(f"Callback data: {data}")
     
     if data == "upload_file":
         await query.edit_message_text(
@@ -174,6 +175,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("delete_file_"):
         file_id = int(data.split("_")[2])
         await delete_file(query, file_id)
+    
+    elif data.startswith("answer_"):
+        await handle_answer(query, context, data)
+    
+    elif data == "skip_question":
+        context.user_data['test_skipped'] = context.user_data.get('test_skipped', 0) + 1
+        context.user_data['test_current'] = context.user_data.get('test_current', 0) + 1
+        await show_question(query, context)
+    
+    elif data == "finish_test":
+        await finish_test(query, context)
 
 async def show_main_menu(query):
     """Show main menu"""
@@ -318,6 +330,25 @@ async def show_question(query, context):
     keyboard.append([InlineKeyboardButton("📊 Yakunlash", callback_data="finish_test")])
     
     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def handle_answer(query, context, data):
+    """Handle answer selection"""
+    letter = data.split("_")[1]
+    current = context.user_data.get('test_current', 0)
+    questions = context.user_data.get('test_questions', [])
+    
+    if current < len(questions):
+        q = questions[current]
+        if letter == q['correct_answer']:
+            context.user_data['test_correct'] = context.user_data.get('test_correct', 0) + 1
+        else:
+            context.user_data['test_wrong'] = context.user_data.get('test_wrong', 0) + 1
+        
+        context.user_data['test_answers'] = context.user_data.get('test_answers', {})
+        context.user_data['test_answers'][current] = letter
+        context.user_data['test_current'] = current + 1
+        
+        await show_question(query, context)
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle file upload"""
@@ -581,22 +612,28 @@ def webhook():
 
 @app.route('/webhook-info')
 def webhook_info():
-    """Get webhook info"""
+    """Get webhook info - requests ni ishlatmaymiz"""
     try:
+        import urllib.request
+        import json
         url = f"https://api.telegram.org/bot{TOKEN}/getWebhookInfo"
-        response = requests.get(url)
-        return jsonify(response.json())
+        with urllib.request.urlopen(url) as response:
+            data = json.loads(response.read().decode())
+            return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)})
 
 @app.route('/set-webhook')
 def set_webhook():
-    """Set webhook manually"""
+    """Set webhook manually - requests ni ishlatmaymiz"""
     try:
+        import urllib.request
+        import json
         webhook_url = WEBAPP_URL.rstrip('/') + '/webhook'
         url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={webhook_url}"
-        response = requests.get(url)
-        return jsonify(response.json())
+        with urllib.request.urlopen(url) as response:
+            data = json.loads(response.read().decode())
+            return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)})
 
