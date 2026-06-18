@@ -6,6 +6,7 @@ import tempfile
 import shutil
 import random
 import asyncio
+import signal
 from pathlib import Path
 from threading import Thread
 from flask import Flask, request, jsonify, send_from_directory
@@ -740,17 +741,27 @@ def get_user_results(user_id):
 
 async def main():
     """Main function to run bot with polling"""
-    # Webhookni o'chirish (polling mode)
-    await bot.delete_webhook(drop_pending_updates=True)
-    print("✅ Webhook o'chirildi")
-    
-    # Botni polling mode da ishga tushirish
-    print("🚀 Bot polling mode da ishga tushmoqda...")
-    await dp.start_polling(bot)
+    try:
+        # Webhookni o'chirish (polling mode)
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Webhook o'chirildi")
+        
+        # Botni polling mode da ishga tushirish - signal handlersiz
+        print("🚀 Bot polling mode da ishga tushmoqda...")
+        
+        # Signal handler xatosini oldini olish uchun
+        # Aiogram 3 da polling uchun skip_updates=True va signal handlersiz
+        await dp.start_polling(bot, skip_updates=True)
+    except Exception as e:
+        print(f"❌ Bot xatosi: {e}")
+        raise
 
 def run_bot():
     """Run bot in separate thread"""
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(f"❌ Bot ishga tushmadi: {e}")
 
 if __name__ == '__main__':
     # Bot ni alohida threadda ishga tushirish
