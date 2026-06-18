@@ -1,4 +1,5 @@
 aiogram>=3.0.0
+python-telegram-bot
 python-docx>=0.8.11
 python-dotenv>=1.0.0
 flask
