@@ -1,47 +1,38 @@
 import os
+import json
 import sqlite3
 import asyncio
 import datetime
 import tempfile
 import shutil
 import random
-import re
 from pathlib import Path
 from threading import Thread
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, filters, ContextTypes
 )
-from telegram.constants import ParseMode
-
-# DOCX uchun
-try:
-    from docx import Document
-except ImportError:
-    Document = None
+import mammoth
+from bs4 import BeautifulSoup
 
 # ==================== KONFIGURATSIYA ====================
-TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TOKEN")
-if not TOKEN:
-    raise ValueError("BOT_TOKEN muhit o'zgaruvchisi o'rnatilmagan!")
+TOKEN = os.getenv("TOKEN")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-app.onrender.com")
 
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://bot-gujm.onrender.com")
-PORT = int(os.environ.get("PORT", 10000))
-
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
+CORS(app)
 
 # ==================== DATABASE ====================
-DB_PATH = "data/test_bot.db"
-os.makedirs("data", exist_ok=True)
-os.makedirs("uploads", exist_ok=True)
+DB_PATH = "test_bot.db"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
         username TEXT,
@@ -49,7 +40,7 @@ def init_db():
         last_name TEXT,
         registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS files (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
@@ -57,12 +48,10 @@ def init_db():
         file_path TEXT,
         file_size INTEGER,
         original_name TEXT,
-        format TEXT,
-        question_count INTEGER DEFAULT 0,
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(user_id)
     )''')
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS test_questions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         file_id INTEGER,
@@ -72,44 +61,29 @@ def init_db():
         option_c TEXT,
         option_d TEXT,
         correct_answer TEXT,
-        FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+        FOREIGN KEY (file_id) REFERENCES files(id)
     )''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS test_sessions (
+
+    c.execute('''CREATE TABLE IF NOT EXISTS test_results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
         file_id INTEGER,
         total_questions INTEGER,
-        correct_answers INTEGER DEFAULT 0,
-        wrong_answers INTEGER DEFAULT 0,
-        skipped_answers INTEGER DEFAULT 0,
-        score REAL DEFAULT 0,
-        status TEXT DEFAULT 'in_progress',
-        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        finished_at TIMESTAMP,
+        correct_answers INTEGER,
+        wrong_answers INTEGER,
+        skipped_answers INTEGER,
+        score INTEGER,
+        test_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(user_id),
         FOREIGN KEY (file_id) REFERENCES files(id)
     )''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS test_answers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id INTEGER,
-        question_number INTEGER,
-        question_text TEXT,
-        user_answer TEXT,
-        correct_answer TEXT,
-        is_correct BOOLEAN,
-        FOREIGN KEY (session_id) REFERENCES test_sessions(id)
-    )''')
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS user_settings (
         user_id INTEGER PRIMARY KEY,
         default_test_count INTEGER DEFAULT 10,
-        shuffle_questions BOOLEAN DEFAULT 1,
-        shuffle_options BOOLEAN DEFAULT 1,
         FOREIGN KEY (user_id) REFERENCES users(user_id)
     )''')
-    
+
     conn.commit()
     conn.close()
 
@@ -118,793 +92,270 @@ init_db()
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-# ==================== PARSERLAR ====================
-
-def parse_txt_file(file_path):
-    questions = []
-    
-    content = None
-    for enc in ("utf-8-sig", "utf-8", "cp1251", "windows-1251", "latin-1"):
-        try:
-            with open(file_path, "r", encoding=enc) as f:
-                content = f.read()
-            break
-        except (UnicodeDecodeError, LookupError):
-            pass
-    
-    if not content:
-        return []
-    
-    lines = content.splitlines()
-    non_empty = [l.strip() for l in lines if l.strip()]
-    
-    if not non_empty:
-        return []
-    
-    has_hash = any(l.startswith("#") for l in non_empty)
-    has_plus = any(l.startswith("+") for l in non_empty)
-    has_pipe = any("|" in l and l.count("|") >= 4 for l in non_empty)
-    has_numbered = any(re.match(r"^\d+[.)]\s+", l) for l in non_empty)
-    has_abcd = any(re.match(r"^[A-Da-d][.)]\s+", l) for l in non_empty)
-    
-    if has_hash and has_plus:
-        questions = parse_hash_format(lines)
-        if questions:
-            return questions
-    
-    if has_numbered and has_abcd:
-        questions = parse_numbered_format(lines)
-        if questions:
-            return questions
-    
-    if has_pipe:
-        questions = parse_pipe_format(non_empty)
-        if questions:
-            return questions
-    
-    questions = parse_qa_format(lines)
-    if questions:
-        return questions
-    
-    for parser in [parse_hash_format, parse_numbered_format, parse_qa_format]:
-        questions = parser(lines)
-        if questions:
-            return questions
-    
-    questions = parse_pipe_format(non_empty)
-    return questions
-
-
-def parse_hash_format(lines):
-    questions = []
-    current_q = None
-    correct = None
-    opts = []
-    state = "idle"
-    
-    def flush():
-        nonlocal current_q, correct, opts, state
-        if current_q and correct and len(opts) >= 2:
-            all_opts = opts[:4]
-            while len(all_opts) < 4:
-                all_opts.append(f"Variant {len(all_opts) + 1}")
-            if correct not in all_opts:
-                all_opts.insert(0, correct)
-                all_opts = all_opts[:4]
-            questions.append({
-                "text": current_q,
-                "options": all_opts,
-                "correct": correct
-            })
-        current_q, correct, opts, state = None, None, [], "idle"
-    
-    for raw in lines:
-        line = raw.strip()
-        if not line:
-            continue
-        
-        if line.startswith("#") or line.startswith("?"):
-            flush()
-            q = line[1:].strip()
-            q = re.sub(r"\s*\?$", "", q).strip()
-            if q:
-                current_q = q
-                state = "idle"
-            else:
-                state = "need_q"
-        
-        elif state == "need_q":
-            current_q = re.sub(r"\s*\?$", "", line).strip()
-            state = "idle"
-        
-        elif line.startswith("+"):
-            ans = line[1:].strip()
-            if not ans:
-                state = "need_correct"
-            elif current_q is not None:
-                correct = ans
-                if ans not in opts:
-                    opts.append(ans)
-                state = "idle"
-        
-        elif state == "need_correct":
-            correct = line
-            if line not in opts:
-                opts.append(line)
-            state = "idle"
-        
-        elif line.startswith("-"):
-            ans = line[1:].strip()
-            if not ans:
-                state = "need_wrong"
-            elif current_q is not None and ans not in opts:
-                opts.append(ans)
-        
-        elif state == "need_wrong":
-            if current_q is not None and line not in opts:
-                opts.append(line)
-            state = "idle"
-    
-    flush()
-    return questions
-
-
-def parse_numbered_format(lines):
-    questions = []
-    current_q = None
-    opts_dict = {}
-    correct_letter = None
-    
-    def flush():
-        nonlocal current_q, opts_dict, correct_letter
-        if current_q and opts_dict and correct_letter:
-            ul = correct_letter.upper()
-            if ul in opts_dict:
-                correct_ans = opts_dict[ul]
-                options = list(opts_dict.values())[:4]
-                while len(options) < 4:
-                    options.append(f"Variant {len(options) + 1}")
-                questions.append({
-                    "text": current_q,
-                    "options": options,
-                    "correct": correct_ans
-                })
-        current_q, opts_dict, correct_letter = None, {}, None
-    
-    for raw in lines:
-        line = raw.strip()
-        if not line:
-            continue
-        
-        m = re.match(r"^(\d+)[.)]\s+(.+)$", line)
-        if m:
-            flush()
-            current_q = m.group(2).strip()
-            continue
-        
-        m = re.match(r"^([A-Da-d])[.)]\s+(.+)$", line)
-        if m:
-            opts_dict[m.group(1).upper()] = m.group(2).strip()
-            continue
-        
-        m = re.match(
-            r"^(?:Javob|To'g'ri\s*javob|Answer|Ans|Togri\s*javob|Javobi)[:\s]*([A-Da-d])",
-            line, re.IGNORECASE
-        )
-        if m:
-            correct_letter = m.group(1).upper()
-    
-    flush()
-    return questions
-
-
-def parse_pipe_format(lines):
-    questions = []
-    for line in lines:
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) >= 5 and parts[0]:
-            questions.append({
-                "text": parts[0],
-                "options": parts[1:5],
-                "correct": parts[1]
-            })
-    return questions
-
-
-def parse_qa_format(lines):
-    questions = []
-    current_q = None
-    current_ans = None
-    
-    def flush():
-        nonlocal current_q, current_ans
-        if current_q and current_ans:
-            questions.append({
-                "text": current_q,
-                "options": [current_ans, "Variant B", "Variant C", "Variant D"],
-                "correct": current_ans
-            })
-        current_q, current_ans = None, None
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            flush()
-            continue
-        
-        if re.match(r"^(savol|question)\s*:", line, re.IGNORECASE):
-            flush()
-            current_q = re.split(r":\s*", line, maxsplit=1)[-1].strip()
-        elif re.match(r"^(javob|answer)\s*:", line, re.IGNORECASE):
-            current_ans = re.split(r":\s*", line, maxsplit=1)[-1].strip()
-    
-    flush()
-    return questions
-
-
-def parse_docx_file(file_path):
-    if not Document:
-        return []
-    
-    try:
-        doc = Document(file_path)
-        questions = []
-        
-        for table in doc.tables:
-            for row in table.rows:
-                cells = [cell.text.strip() for cell in row.cells]
-                cells = [c for c in cells if c]
-                if len(cells) >= 5:
-                    questions.append({
-                        "text": cells[0],
-                        "options": cells[1:5],
-                        "correct": cells[1]
-                    })
-        
-        if not questions:
-            lines = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-            for parser in [parse_hash_format, parse_numbered_format, parse_qa_format]:
-                questions = parser(lines)
-                if questions:
-                    break
-        
-        return questions
-    except Exception as e:
-        print(f"DOCX o'qishda xatolik: {e}")
-        return []
-
-
-# ==================== BOT HANDLERLAR ====================
+# ==================== BOT HANDLERS ====================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    
+
     conn = get_db()
     c = conn.cursor()
     c.execute('''INSERT OR IGNORE INTO users (user_id, username, first_name, last_name)
                  VALUES (?, ?, ?, ?)''',
               (user.id, user.username, user.first_name, user.last_name))
-    c.execute('''INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)''', (user.id,))
     conn.commit()
     conn.close()
+
+    webapp_url = WEBAPP_URL.rstrip('/')
     
     keyboard = [
+        [InlineKeyboardButton("🌐 Web App ni ochish", web_app=dict(url=webapp_url))],
         [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
         [InlineKeyboardButton("📊 Mening testlarim", callback_data="my_tests")],
         [InlineKeyboardButton("📈 Natijalarim", callback_data="my_results")],
-        [InlineKeyboardButton("📁 Fayllarim", callback_data="my_files")],
-        [InlineKeyboardButton("⚙️ Sozlamalar", callback_data="settings")],
         [InlineKeyboardButton("💡 Yordam", callback_data="help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     await update.message.reply_text(
         f"👋 Assalomu alaykum, {user.first_name}!\n\n"
-        "🎯 <b>TEST MASTER BOT</b> ga xush kelibsiz!\n\n"
-        "✨ <b>Imkoniyatlar:</b>\n"
-        "• 📄 Test fayllarni yuklash (TXT, DOCX)\n"
-        "• 🎲 Savollar va variantlar aralash\n"
-        "• 📝 Test sonini o'zingiz belgilaysiz\n"
-        "• 📊 Batafsil statistika\n"
-        "• 📁 Fayllar tarixi\n\n"
-        "📎 <b>Qo'llab-quvvatlanadigan formatlar:</b>\n"
-        "• <code>.txt</code> — Matnli fayl\n"
-        "• <code>.docx</code> — Word\n\n"
-        "Boshlash uchun menyudan tanlang 👇",
-        parse_mode=ParseMode.HTML,
+        "Men test tizimi botiman. Siz test fayllarni yuklab, ular ustida test topshirishingiz mumkin.\n\n"
+        "📁 Qo'llab-quvvatlanadigan formatlar: TXT, DOCX\n"
+        "⚠️ DOC format qo'llab-quvvatlanmaydi (faqat DOCX).\n\n"
+        "🖥️ Web App orqali ham ishlashingiz mumkin!",
         reply_markup=reply_markup
     )
 
-
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📖 <b>YORDAM</b>\n\n"
-        "<b>📝 TXT Format 1</b> (# belgisi):\n"
-        "<code># Savol matni\n+ To'g'ri javob\n- Noto'g'ri 1\n- Noto'g'ri 2\n- Noto'g'ri 3</code>\n\n"
-        "<b>📝 TXT Format 2</b> (A/B/C/D):\n"
-        "<code>1. Savol matni\nA) To'g'ri\nB) Noto'g'ri 1\nC) Noto'g'ri 2\nD) Noto'g'ri 3\nJavob: A</code>\n\n"
-        "<b>📝 TXT Format 3</b> (Pipe):\n"
-        "<code>Savol|A variant|B variant|C variant|D variant</code>\n\n"
-        "<b>📘 DOCX:</b> 5 ustunli jadval\n(1-ustun: Savol, 2-5: Variantlar)",
-        parse_mode=ParseMode.HTML
+        "📖 *Yordam*\n\n"
+        "1. 'Test fayl yuklash' - test faylini yuklang (TXT, DOCX)\n"
+        "2. Fayl yuklangandan so'ng, test boshlash mumkin\n"
+        "3. Har bir test uchun nechta savol olishni sozlashingiz mumkin\n"
+        "4. Natijalar saqlanadi va istalgan vaqt ko'rish mumkin\n\n"
+        "📝 *Test fayl formatlari:*\n"
+        "• Savol va 4 ta variant bo'lishi kerak\n"
+        "• HTML jadval formatida yoki matn formatida bo'lishi mumkin",
+        parse_mode="Markdown"
     )
-
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
+
     data = query.data
-    user_id = query.from_user.id
-    
+
     if data == "upload_file":
         await query.edit_message_text(
-            "📤 <b>Test faylini yuklang</b>\n\n"
-            "Faylni yuboring (TXT yoki DOCX).\n\n"
-            "📝 Format haqida ma'lumot uchun /help",
-            parse_mode=ParseMode.HTML
+            "📤 *Test faylini yuklang*\n\n"
+            "Faylni yuboring (TXT, DOCX).\n\n"
+            "⚠️ Eslatma: .DOC formatdagi fayllar qo'llab-quvvatlanmaydi!",
+            parse_mode="Markdown"
         )
         context.user_data['waiting_for_file'] = True
-    
+
     elif data == "my_tests":
-        await show_available_tests(query, user_id)
-    
+        await show_user_tests(query)
+
     elif data == "my_results":
-        await show_user_results(query, user_id)
-    
-    elif data == "my_files":
-        await show_user_files(query, user_id)
-    
-    elif data == "settings":
-        await show_settings(query, user_id)
-    
+        await show_user_results(query)
+
     elif data == "help":
-        await show_help(query)
-    
+        await query.edit_message_text(
+            "📖 *Yordam*\n\n"
+            "1. 'Test fayl yuklash' - test faylini yuklang (TXT, DOCX)\n"
+            "2. Fayl yuklangandan so'ng, test boshlash mumkin\n"
+            "3. Har bir test uchun nechta savol olishni sozlashingiz mumkin\n"
+            "4. Natijalar saqlanadi va istalgan vaqt ko'rish mumkin\n\n"
+            "🌐 Web App: " + WEBAPP_URL,
+            parse_mode="Markdown"
+        )
+
     elif data == "back_to_main":
         await show_main_menu(query)
-    
+
     elif data.startswith("test_"):
         file_id = int(data.split("_")[1])
-        await prepare_test(query, context, file_id)
-    
-    elif data.startswith("set_count_"):
-        count = int(data.split("_")[2])
-        await set_test_count(query, user_id, count)
-    
-    elif data.startswith("start_test_"):
-        parts = data.split("_")
-        file_id = int(parts[2])
-        count_param = parts[3] if len(parts) > 3 else "10"
-        await start_test(query, context, file_id, count_param)
-    
+        await start_test(query, context, file_id)
+
     elif data.startswith("delete_file_"):
         file_id = int(data.split("_")[2])
-        await delete_file(query, user_id, file_id)
-    
+        await delete_file(query, file_id)
+
     elif data.startswith("answer_"):
         await handle_answer(query, context, data)
-    
+
     elif data == "skip_question":
-        await skip_question(query, context)
-    
+        context.user_data['test_skipped'] = context.user_data.get('test_skipped', 0) + 1
+        context.user_data['test_current'] = context.user_data.get('test_current', 0) + 1
+        await show_question(query, context)
+
     elif data == "finish_test":
         await finish_test(query, context)
-    
-    elif data.startswith("retry_"):
-        file_id = int(data.split("_")[1])
-        await prepare_test(query, context, file_id)
-    
-    elif data == "cancel_test":
-        await cancel_test(query, context)
 
 
 async def show_main_menu(query):
+    webapp_url = WEBAPP_URL.rstrip('/')
     keyboard = [
+        [InlineKeyboardButton("🌐 Web App ni ochish", web_app=dict(url=webapp_url))],
         [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
         [InlineKeyboardButton("📊 Mening testlarim", callback_data="my_tests")],
         [InlineKeyboardButton("📈 Natijalarim", callback_data="my_results")],
-        [InlineKeyboardButton("📁 Fayllarim", callback_data="my_files")],
-        [InlineKeyboardButton("⚙️ Sozlamalar", callback_data="settings")],
         [InlineKeyboardButton("💡 Yordam", callback_data="help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
-        "🏠 <b>ASOSIY MENYU</b>\n\nTest tizimiga xush kelibsiz!",
-        parse_mode=ParseMode.HTML,
+        "👋 *Asosiy menyu*\n\nTest tizimiga xush kelibsiz!",
+        parse_mode="Markdown",
         reply_markup=reply_markup
     )
 
 
-async def show_help(query):
-    keyboard = [[InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]]
-    await query.edit_message_text(
-        "📖 <b>YORDAM</b>\n\n"
-        "<b>📝 TXT Format 1</b> (# belgisi):\n"
-        "<code># Savol matni\n+ To'g'ri javob\n- Noto'g'ri 1\n- Noto'g'ri 2\n- Noto'g'ri 3</code>\n\n"
-        "<b>📝 TXT Format 2</b> (A/B/C/D):\n"
-        "<code>1. Savol matni\nA) To'g'ri\nB) Noto'g'ri 1\nC) Noto'g'ri 2\nD) Noto'g'ri 3\nJavob: A</code>\n\n"
-        "<b>📝 TXT Format 3</b> (Pipe):\n"
-        "<code>Savol|A variant|B variant|C variant|D variant</code>\n\n"
-        "<b>📘 DOCX:</b> 5 ustunli jadval",
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-
-async def show_available_tests(query, user_id):
+async def show_user_tests(query):
+    user_id = query.from_user.id
     conn = get_db()
     c = conn.cursor()
-    files = c.execute('''SELECT id, original_name, question_count, uploaded_at
+    files = c.execute('''SELECT id, file_name, uploaded_at,
+                         (SELECT COUNT(*) FROM test_questions WHERE file_id = files.id) as question_count
                          FROM files WHERE user_id = ? ORDER BY uploaded_at DESC''',
                       (user_id,)).fetchall()
     conn.close()
-    
+
     if not files:
         keyboard = [[InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]]
         await query.edit_message_text(
-            "📂 Siz hali hech qanday test fayl yuklamagansiz.\n\n"
-            "📤 Fayl yuklash uchun 'Test fayl yuklash' tugmasini bosing.",
+            "📂 Siz hali hech qanday test fayl yuklamagansiz.",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
-    
-    text = "📊 <b>TEST BOSHLASH</b>\n\nFaylni tanlang:\n\n"
+
+    text = "📂 *Mening testlarim*\n\n"
     keyboard = []
-    
-    for i, f in enumerate(files, 1):
-        text += f"<b>{i}.</b> {f['original_name']} — <b>{f['question_count']} savol</b>\n"
+
+    for f in files[:5]:  # Faqat 5 tasini ko'rsatamiz
+        text += f"📄 {f['file_name']} — {f['question_count']} savol\n"
         keyboard.append([
-            InlineKeyboardButton(
-                f"▶️ {f['original_name'][:30]}",
-                callback_data=f"test_{f['id']}"
-            )
+            InlineKeyboardButton(f"▶️ {f['file_name'][:20]}", callback_data=f"test_{f['id']}")
         ])
-    
+
     keyboard.append([InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")])
-    
-    await query.edit_message_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-async def show_user_files(query, user_id):
+async def show_user_results(query):
+    user_id = query.from_user.id
     conn = get_db()
     c = conn.cursor()
-    files = c.execute('''SELECT id, original_name, question_count, uploaded_at
-                         FROM files WHERE user_id = ? ORDER BY uploaded_at DESC LIMIT 10''',
-                      (user_id,)).fetchall()
-    conn.close()
-    
-    if not files:
-        keyboard = [[InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]]
-        await query.edit_message_text(
-            "📁 Hali hech qanday fayl yuklanmagan.",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
-    
-    text = "📁 <b>MENING FAYLLARIM</b>\n\n"
-    keyboard = []
-    
-    for f in files:
-        text += f"📄 {f['original_name']} — {f['question_count']} savol\n"
-        text += f"   📅 {f['uploaded_at'][:16]}\n\n"
-        keyboard.append([
-            InlineKeyboardButton(f"🗑️ {f['original_name'][:25]}", callback_data=f"delete_file_{f['id']}")
-        ])
-    
-    keyboard.append([InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")])
-    
-    await query.edit_message_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-
-async def show_user_results(query, user_id):
-    conn = get_db()
-    c = conn.cursor()
-    results = c.execute('''SELECT ts.*, f.original_name
-                          FROM test_sessions ts
-                          JOIN files f ON ts.file_id = f.id
-                          WHERE ts.user_id = ? AND ts.status = 'completed'
-                          ORDER BY ts.finished_at DESC LIMIT 10''',
+    results = c.execute('''SELECT tr.*, f.file_name
+                          FROM test_results tr
+                          JOIN files f ON tr.file_id = f.id
+                          WHERE tr.user_id = ?
+                          ORDER BY tr.test_date DESC LIMIT 10''',
                        (user_id,)).fetchall()
-    
-    total_tests = len(results)
-    avg_score = sum(r['score'] for r in results) / len(results) if results else 0
-    total_correct = sum(r['correct_answers'] for r in results)
-    total_questions = sum(r['total_questions'] for r in results)
-    
     conn.close()
-    
+
     keyboard = [[InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]]
-    
+
     if not results:
         await query.edit_message_text(
-            "📊 Siz hali hech qanday test topshirmagansiz.",
+            "📊 Siz hali hech qanday test natijasiga ega emassiz.",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
-    
-    text = "📊 <b>NATIJALARIM</b>\n\n"
-    text += f"📝 Jami testlar: <b>{total_tests} ta</b>\n"
-    text += f"📈 O'rtacha: <b>{avg_score:.1f}%</b>\n"
-    text += f"✅ Jami to'g'ri: <b>{total_correct}</b> / {total_questions}\n\n"
-    text += "━" * 30 + "\n\n"
-    
-    for i, r in enumerate(results[:5], 1):
-        text += f"<b>{i}.</b> {r['original_name']}\n"
+
+    text = "📊 *Oxirgi 10 ta natija*\n\n"
+    for r in results:
+        date = r['test_date'][:16] if r['test_date'] else "N/A"
+        text += f"📄 {r['file_name'][:30]}\n"
+        text += f"   📅 {date}\n"
         text += f"   ✅ {r['correct_answers']} | ❌ {r['wrong_answers']} | ⏭️ {r['skipped_answers']}\n"
-        text += f"   📊 {r['score']:.1f}%\n\n"
-    
-    await query.edit_message_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+        text += f"   📊 Ball: {r['score']}%\n\n"
+
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-async def show_settings(query, user_id):
-    conn = get_db()
-    c = conn.cursor()
-    settings = c.execute('SELECT * FROM user_settings WHERE user_id = ?', (user_id,)).fetchone()
-    conn.close()
-    
-    current_count = settings['default_test_count'] if settings else 10
-    count_label = "Barchasi" if current_count == 0 else f"{current_count} ta"
-    
-    keyboard = [
-        [InlineKeyboardButton(f"📝 10 ta savol {'✅' if current_count == 10 else ''}", callback_data="set_count_10")],
-        [InlineKeyboardButton(f"📝 25 ta savol {'✅' if current_count == 25 else ''}", callback_data="set_count_25")],
-        [InlineKeyboardButton(f"📝 50 ta savol {'✅' if current_count == 50 else ''}", callback_data="set_count_50")],
-        [InlineKeyboardButton(f"📝 Barchasi {'✅' if current_count == 0 else ''}", callback_data="set_count_0")],
-        [InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]
-    ]
-    
-    await query.edit_message_text(
-        f"⚙️ <b>SOZLAMALAR</b>\n\n"
-        f"📝 Testlar soni: <b>{count_label}</b>\n\n"
-        "Test boshlaganda nechta savol olishni tanlang:",
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-
-async def set_test_count(query, user_id, count):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('''INSERT OR REPLACE INTO user_settings (user_id, default_test_count)
-                 VALUES (?, ?)''', (user_id, count))
-    conn.commit()
-    conn.close()
-    
-    label = "Barchasi" if count == 0 else f"{count} ta"
-    await query.answer(f"✅ Testlar soni {label} ga o'rnatildi")
-    await show_settings(query, user_id)
-
-
-async def prepare_test(query, context, file_id):
+async def start_test(query, context, file_id):
     user_id = query.from_user.id
-    
+
     conn = get_db()
     c = conn.cursor()
-    file_info = c.execute('SELECT * FROM files WHERE id = ? AND user_id = ?', 
-                          (file_id, user_id)).fetchone()
-    settings = c.execute('SELECT * FROM user_settings WHERE user_id = ?', (user_id,)).fetchone()
-    conn.close()
-    
-    if not file_info:
-        await query.answer("❌ Fayl topilmadi!", show_alert=True)
-        return
-    
-    total = file_info['question_count']
+    settings = c.execute('SELECT default_test_count FROM user_settings WHERE user_id = ?',
+                        (user_id,)).fetchone()
     default_count = settings['default_test_count'] if settings else 10
-    
-    if default_count > total or default_count == 0:
-        default_count = total
-    
-    opts = sorted({n for n in (5, 10, 15, 20, 25, 30, 50) if n <= total} | {total})
-    
-    keyboard = []
-    row = []
-    for i, c in enumerate(opts):
-        label = f"📚 Hammasi ({c})" if c == total else f"📝 {c} ta"
-        row.append(InlineKeyboardButton(label, callback_data=f"start_test_{file_id}_{c}"))
-        if len(row) == 2 or i == len(opts) - 1:
-            keyboard.append(row)
-            row = []
-    
-    keyboard.append([InlineKeyboardButton("🎲 Tasodifiy", callback_data=f"start_test_{file_id}_random")])
-    keyboard.append([InlineKeyboardButton("❌ Bekor qilish", callback_data="my_tests")])
-    
-    await query.edit_message_text(
-        f"📝 <b>TEST SONINI TANLANG</b>\n\n"
-        f"📄 Fayl: {file_info['original_name']}\n"
-        f"📚 Jami savollar: <b>{total} ta</b>\n\n"
-        f"<i>Variantni tanlang 👇</i>",
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
 
-
-async def start_test(query, context, file_id, count_param):
-    user_id = query.from_user.id
-    
-    conn = get_db()
-    c = conn.cursor()
-    
-    questions = c.execute('''SELECT * FROM test_questions WHERE file_id = ?''', 
-                         (file_id,)).fetchall()
-    settings = c.execute('SELECT * FROM user_settings WHERE user_id = ?', (user_id,)).fetchone()
+    questions = c.execute('SELECT * FROM test_questions WHERE file_id = ?', (file_id,)).fetchall()
     conn.close()
-    
+
     if not questions:
         await query.edit_message_text("❌ Bu faylda savollar topilmadi.")
         return
-    
+
     questions = list(questions)
-    total_available = len(questions)
-    
-    if count_param == "random":
-        count = random.randint(min(5, total_available), min(50, total_available))
-    else:
-        count = int(count_param)
-        if count > total_available:
-            count = total_available
-    
-    if settings and settings['shuffle_questions']:
-        random.shuffle(questions)
-    
-    selected = questions[:count]
-    
-    processed_questions = []
-    for q in selected:
-        options = [q['option_a'], q['option_b'], q['option_c'], q['option_d']]
-        correct = q['correct_answer']
-        
-        if settings and settings['shuffle_options']:
-            random.shuffle(options)
-        
-        try:
-            correct_idx = options.index(correct)
-        except ValueError:
-            correct_idx = 0
-            options[0] = correct
-        
-        processed_questions.append({
-            'id': q['id'],
-            'text': q['question_text'],
-            'options': options,
-            'correct': correct,
-            'correct_idx': correct_idx
-        })
-    
-    conn = get_db()
-    c = conn.cursor()
-    c.execute('''INSERT INTO test_sessions (user_id, file_id, total_questions)
-                 VALUES (?, ?, ?)''', (user_id, file_id, count))
-    session_id = c.lastrowid
-    conn.commit()
-    conn.close()
-    
-    context.user_data['test_session_id'] = session_id
+    total = len(questions)
+
+    if default_count > 0 and default_count < total:
+        questions = random.sample(questions, default_count)
+
+    context.user_data['test_questions'] = questions
     context.user_data['test_file_id'] = file_id
-    context.user_data['test_questions'] = processed_questions
     context.user_data['test_current'] = 0
+    context.user_data['test_answers'] = {}
     context.user_data['test_correct'] = 0
     context.user_data['test_wrong'] = 0
     context.user_data['test_skipped'] = 0
-    context.user_data['test_answers'] = []
-    
-    await query.edit_message_text(
-        f"🚀 <b>TEST BOSHLANDI!</b>\n\n"
-        f"📝 Jami: <b>{count} ta savol</b>\n"
-        f"🎲 Savollar aralash holda\n\n"
-        f"<i>Omad! 🍀</i>",
-        parse_mode=ParseMode.HTML
-    )
-    
-    await asyncio.sleep(1.5)
+
     await show_question(query, context)
 
 
 async def show_question(query, context):
     questions = context.user_data.get('test_questions', [])
     current = context.user_data.get('test_current', 0)
-    
+
     if current >= len(questions):
         await finish_test(query, context)
         return
-    
+
     q = questions[current]
-    
-    text = f"📝 <b>Savol {current + 1}/{len(questions)}</b>\n\n"
-    text += f"<b>{q['text']}</b>\n\n"
-    
+
+    text = f"📝 *Savol {current + 1}/{len(questions)}*\n\n"
+    text += f"{q['question_text']}\n\n"
+
+    options = [
+        ('A', q['option_a']),
+        ('B', q['option_b']),
+        ('C', q['option_c']),
+        ('D', q['option_d'])
+    ]
+
     keyboard = []
-    for i, opt in enumerate(q['options']):
-        letter = chr(65 + i)
-        if opt:
-            display_opt = opt[:50] + ('...' if len(opt) > 50 else '')
-            keyboard.append([InlineKeyboardButton(
-                f"{letter}) {display_opt}",
-                callback_data=f"answer_{i}_{q['correct_idx']}"
-            )])
-    
-    keyboard.append([
-        InlineKeyboardButton("⏭️ O'tkazish", callback_data="skip_question"),
-        InlineKeyboardButton("🔴 Yakunlash", callback_data="finish_test")
-    ])
-    
-    await query.edit_message_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    for letter, opt_text in options:
+        if opt_text and opt_text.strip():
+            keyboard.append([InlineKeyboardButton(f"{letter}) {opt_text[:40]}", callback_data=f"answer_{letter}")])
+
+    keyboard.append([InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="skip_question")])
+    keyboard.append([InlineKeyboardButton("📊 Yakunlash", callback_data="finish_test")])
+
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 async def handle_answer(query, context, data):
-    parts = data.split("_")
-    user_choice = int(parts[1])
-    correct_idx = int(parts[2])
-    
-    questions = context.user_data.get('test_questions', [])
+    letter = data.split("_")[1]
     current = context.user_data.get('test_current', 0)
-    
-    if current >= len(questions):
-        return
-    
-    q = questions[current]
-    is_correct = (user_choice == correct_idx)
-    
-    if is_correct:
-        context.user_data['test_correct'] = context.user_data.get('test_correct', 0) + 1
-    else:
-        context.user_data['test_wrong'] = context.user_data.get('test_wrong', 0) + 1
-    
-    context.user_data['test_answers'] = context.user_data.get('test_answers', [])
-    context.user_data['test_answers'].append({
-        'question_text': q['text'],
-        'user_answer': q['options'][user_choice],
-        'correct_answer': q['correct'],
-        'is_correct': is_correct
-    })
-    
-    context.user_data['test_current'] = current + 1
-    
-    emoji = "✅" if is_correct else "❌"
-    await query.answer(f"{emoji} {'To\'g\'ri!' if is_correct else 'Noto\'g\'ri!'}")
-    
-    await show_question(query, context)
-
-
-async def skip_question(query, context):
     questions = context.user_data.get('test_questions', [])
-    current = context.user_data.get('test_current', 0)
-    
+
     if current < len(questions):
         q = questions[current]
-        context.user_data['test_answers'] = context.user_data.get('test_answers', [])
-        context.user_data['test_answers'].append({
-            'question_text': q['text'],
-            'user_answer': "O'tkazildi",
-            'correct_answer': q['correct'],
-            'is_correct': False
-        })
-    
-    context.user_data['test_skipped'] = context.user_data.get('test_skipped', 0) + 1
-    context.user_data['test_current'] = current + 1
-    
-    await query.answer("⏭️ O'tkazildi")
-    await show_question(query, context)
+        if letter == q['correct_answer']:
+            context.user_data['test_correct'] = context.user_data.get('test_correct', 0) + 1
+        else:
+            context.user_data['test_wrong'] = context.user_data.get('test_wrong', 0) + 1
+
+        context.user_data['test_answers'] = context.user_data.get('test_answers', {})
+        context.user_data['test_answers'][current] = letter
+        context.user_data['test_current'] = current + 1
+
+        await show_question(query, context)
 
 
 async def finish_test(query, context):
@@ -912,213 +363,321 @@ async def finish_test(query, context):
     wrong = context.user_data.get('test_wrong', 0)
     skipped = context.user_data.get('test_skipped', 0)
     total = len(context.user_data.get('test_questions', []))
-    session_id = context.user_data.get('test_session_id')
-    file_id = context.user_data.get('test_file_id')
-    answers = context.user_data.get('test_answers', [])
-    
+
     if total == 0:
         await query.edit_message_text("❌ Xatolik yuz berdi.")
         return
-    
-    score = (correct / total) * 100
-    
-    if score >= 90:
-        grade, emoji = "A'lo", "🏆"
-    elif score >= 75:
-        grade, emoji = "Yaxshi", "🎉"
-    elif score >= 60:
-        grade, emoji = "Qoniqarli", "👍"
-    else:
-        grade, emoji = "O'qish kerak", "📚"
-    
-    if session_id:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute('''UPDATE test_sessions SET 
-                     correct_answers = ?, wrong_answers = ?, skipped_answers = ?,
-                     score = ?, status = 'completed', finished_at = CURRENT_TIMESTAMP
-                     WHERE id = ?''',
-                  (correct, wrong, skipped, score, session_id))
-        
-        for i, ans in enumerate(answers):
-            c.execute('''INSERT INTO test_answers 
-                         (session_id, question_number, question_text, user_answer, correct_answer, is_correct)
-                         VALUES (?, ?, ?, ?, ?, ?)''',
-                      (session_id, i + 1, ans['question_text'][:200], 
-                       ans['user_answer'][:100], ans['correct_answer'][:100], ans['is_correct']))
-        
-        conn.commit()
-        conn.close()
-    
-    text = f"{emoji} <b>TEST NATIJASI</b>\n\n"
-    text += f"📊 <b>Statistika:</b>\n"
-    text += f"• Jami: <b>{total} ta</b>\n"
-    text += f"• To'g'ri: <b>{correct} ta</b> ✅\n"
-    text += f"• Noto'g'ri: <b>{wrong} ta</b> ❌\n"
-    text += f"• O'tkazilgan: <b>{skipped} ta</b> ⏭️\n\n"
-    text += f"📈 Foiz: <b>{score:.1f}%</b>\n"
-    text += f"🏆 Baho: <b>{grade}</b>"
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("🔄 Qayta urinish", callback_data=f"retry_{file_id}"),
-            InlineKeyboardButton("🏠 Menyu", callback_data="back_to_main")
-        ]
-    ]
-    
-    await query.edit_message_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-    
-    for key in ['test_questions', 'test_current', 'test_correct', 'test_wrong', 
-                'test_skipped', 'test_answers', 'test_session_id', 'test_file_id']:
-        context.user_data.pop(key, None)
 
+    score = int((correct / total) * 100)
 
-async def cancel_test(query, context):
-    for key in ['test_questions', 'test_current', 'test_correct', 'test_wrong', 
-                'test_skipped', 'test_answers', 'test_session_id', 'test_file_id']:
-        context.user_data.pop(key, None)
-    
-    await query.edit_message_text("❌ Test bekor qilindi.")
-    await show_main_menu(query)
+    user_id = query.from_user.id
+    file_id = context.user_data.get('test_file_id')
 
-
-async def delete_file(query, user_id, file_id):
     conn = get_db()
     c = conn.cursor()
-    file_info = c.execute('SELECT * FROM files WHERE id = ? AND user_id = ?', 
-                          (file_id, user_id)).fetchone()
-    
-    if file_info:
-        if file_info['file_path'] and os.path.exists(file_info['file_path']):
-            try:
-                os.unlink(file_info['file_path'])
-            except Exception:
-                pass
-        
-        c.execute('DELETE FROM test_answers WHERE session_id IN (SELECT id FROM test_sessions WHERE file_id = ?)', (file_id,))
-        c.execute('DELETE FROM test_sessions WHERE file_id = ?', (file_id,))
-        c.execute('DELETE FROM test_questions WHERE file_id = ?', (file_id,))
-        c.execute('DELETE FROM files WHERE id = ?', (file_id,))
-        conn.commit()
-    
+    c.execute('''INSERT INTO test_results
+                 (user_id, file_id, total_questions, correct_answers, wrong_answers, skipped_answers, score)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)''',
+              (user_id, file_id, total, correct, wrong, skipped, score))
+    conn.commit()
     conn.close()
-    
+
+    text = "📊 *Test yakunlandi!*\n\n"
+    text += f"✅ To'g'ri: {correct}\n"
+    text += f"❌ Noto'g'ri: {wrong}\n"
+    text += f"⏭️ O'tkazib yuborilgan: {skipped}\n"
+    text += f"📊 Natija: {score}%\n\n"
+
+    if score >= 80:
+        text += "🌟 Ajoyib natija! Siz juda zo'rsiz! 🎉"
+    elif score >= 60:
+        text += "👍 Yaxshi natija! Bir oz ko'proq mashq qiling!"
+    elif score >= 40:
+        text += "📚 O'rtacha natija. Ko'proq o'rganing!"
+    else:
+        text += "💪 Yaxshilanish uchun joy bor. Harakat qiling!"
+
+    keyboard = [[InlineKeyboardButton("🔙 Asosiy menyu", callback_data="back_to_main")]]
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def delete_file(query, file_id):
+    user_id = query.from_user.id
+    conn = get_db()
+    c = conn.cursor()
+    row = c.execute('SELECT file_path FROM files WHERE id = ? AND user_id = ?', (file_id, user_id)).fetchone()
+    if row and row['file_path'] and os.path.exists(row['file_path']):
+        try:
+            os.unlink(row['file_path'])
+        except:
+            pass
+    c.execute('DELETE FROM test_questions WHERE file_id = ?', (file_id,))
+    c.execute('DELETE FROM files WHERE id = ? AND user_id = ?', (file_id, user_id))
+    conn.commit()
+    conn.close()
+
     await query.answer("✅ Fayl o'chirildi")
-    await show_user_files(query, user_id)
+    await show_user_tests(query)
 
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get('waiting_for_file'):
         return
-    
+
     document = update.message.document
     if not document:
         await update.message.reply_text("❌ Iltimos, fayl yuboring.")
         return
-    
+
     file_name = document.file_name
     file_size = document.file_size
     ext = os.path.splitext(file_name)[1].lower()
-    
+
+    # DOC formatini tekshirish
+    if ext == '.doc':
+        await update.message.reply_text(
+            "❌ .DOC format qo'llab-quvvatlanmaydi!\n\n"
+            "Iltimos, faylni Microsoft Word yoki LibreOffice da ochib, "
+            "📁 'Saqlash, nomi bilan' (Save As) → .DOCX formatda saqlang "
+            "va qayta yuboring.\n\n"
+            "Yoki faylni menga yuborib, men uni .DOCX ga o'tkazib beraman.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📤 Faylni menga yuborish", callback_data="convert_doc")],
+                [InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]
+            ])
+        )
+        context.user_data['waiting_for_doc'] = True
+        return
+
     if ext not in ['.txt', '.docx']:
         await update.message.reply_text(
             f"❌ {ext} format qo'llab-quvvatlanmaydi.\n"
-            "Qo'llab-quvvatlanadigan formatlar: <b>TXT, DOCX</b>",
-            parse_mode=ParseMode.HTML
+            "Qo'llab-quvvatlanadigan formatlar: TXT, DOCX"
         )
         return
-    
-    processing_msg = await update.message.reply_text("⏳ Fayl yuklanmoqda va tahlil qilinmoqda...")
-    
+
+    processing_msg = await update.message.reply_text("⏳ Fayl yuklanmoqda...")
+
+    file = await context.bot.get_file(document.file_id)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
+        await file.download_to_drive(tmp_file.name)
+        tmp_path = tmp_file.name
+
     try:
-        file = await context.bot.get_file(document.file_id)
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
-            await file.download_to_drive(tmp_file.name)
-            tmp_path = tmp_file.name
-        
+        questions = []
+
         if ext == '.txt':
-            questions = parse_txt_file(tmp_path)
-        else:
-            questions = parse_docx_file(tmp_path)
-        
+            with open(tmp_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            questions = parse_text_content(content)
+        else:  # DOCX
+            with open(tmp_path, 'rb') as f:
+                result = mammoth.convert_to_html(f)
+                html = result.value
+            questions = parse_html_content(html)
+
         if not questions:
             await processing_msg.edit_text(
                 "❌ Fayldan savollar topilmadi.\n\n"
-                "📝 To'g'ri format haqida ma'lumot uchun /help",
-                parse_mode=ParseMode.HTML
+                "Fayl quyidagi formatda bo'lishi kerak:\n"
+                "Savol matni\n"
+                "A) variant 1\n"
+                "B) variant 2\n"
+                "C) variant 3\n"
+                "D) variant 4\n\n"
+                "Yoki HTML jadval formatida."
             )
             os.unlink(tmp_path)
+            context.user_data['waiting_for_file'] = False
             return
-        
-        user_id = update.effective_user.id
+
         upload_dir = Path("uploads")
         upload_dir.mkdir(exist_ok=True)
-        
-        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        unique_name = f"{user_id}_{timestamp}_{file_name}"
+
+        unique_name = f"{update.effective_user.id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name}"
         file_path = upload_dir / unique_name
         shutil.move(tmp_path, str(file_path))
-        
+
+        user_id = update.effective_user.id
         conn = get_db()
         c = conn.cursor()
-        
-        c.execute('''INSERT INTO files (user_id, file_name, file_path, file_size, original_name, format, question_count)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                  (user_id, unique_name, str(file_path), file_size, file_name, ext[1:].upper(), len(questions)))
-        
-        file_id = c.lastrowid
-        
+
+        c.execute('''INSERT INTO files (user_id, file_name, file_path, file_size, original_name)
+                     VALUES (?, ?, ?, ?, ?)''',
+                  (user_id, unique_name, str(file_path), file_size, file_name))
+
+        db_file_id = c.lastrowid
+
         for q in questions:
             opts = q['options']
             while len(opts) < 4:
-                opts.append(f"Variant {len(opts) + 1}")
-            
+                opts.append('')
             c.execute('''INSERT INTO test_questions
                          (file_id, question_text, option_a, option_b, option_c, option_d, correct_answer)
                          VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                      (file_id, q['text'][:500], opts[0][:200], opts[1][:200], 
-                       opts[2][:200], opts[3][:200], q['correct'][:200]))
-        
+                      (db_file_id, q['text'], opts[0], opts[1], opts[2], opts[3], q['correct']))
+
         conn.commit()
         conn.close()
-        
-        context.user_data['waiting_for_file'] = False
-        
-        keyboard = [
-            [InlineKeyboardButton("▶️ Test boshlash", callback_data=f"test_{file_id}")],
-            [InlineKeyboardButton("🏠 Asosiy menyu", callback_data="back_to_main")]
-        ]
-        
+
         await processing_msg.edit_text(
-            f"✅ <b>Fayl muvaffaqiyatli yuklandi!</b>\n\n"
-            f"📄 Fayl: <code>{file_name}</code>\n"
-            f"📊 Savollar: <b>{len(questions)} ta</b>\n"
+            f"✅ *Fayl muvaffaqiyatli yuklandi!*\n\n"
+            f"📄 {file_name}\n"
+            f"📊 {len(questions)} ta savol\n"
             f"📁 O'lcham: {file_size // 1024} KB\n\n"
-            "Test boshlash uchun tugmani bosing 👇",
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "Mening testlarim bo'limiga o'tib, test boshlashingiz mumkin.",
+            parse_mode="Markdown"
         )
-    
+
+        context.user_data['waiting_for_file'] = False
+
     except Exception as e:
-        await processing_msg.edit_text(f"❌ Xatolik: {str(e)[:200]}")
-        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+        await processing_msg.edit_text(f"❌ Xatolik yuz berdi: {str(e)}")
+        if os.path.exists(tmp_path):
             os.unlink(tmp_path)
+        context.user_data['waiting_for_file'] = False
+
+
+async def handle_doc_conversion(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """DOC faylni qabul qilib, uni DOCX ga o'tkazadi"""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "convert_doc":
+        await query.edit_message_text(
+            "📤 *DOC faylni yuboring*\n\n"
+            "Men uni .DOCX formatga o'tkazib beraman.\n\n"
+            "⚠️ Eslatma: Bu jarayon bir necha soniya vaqt olishi mumkin.",
+            parse_mode="Markdown"
+        )
+        context.user_data['waiting_for_doc_file'] = True
+
+
+async def handle_doc_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Qabul qilingan DOC faylni qayta ishlash"""
+    if not context.user_data.get('waiting_for_doc_file'):
+        return
+
+    document = update.message.document
+    if not document:
+        await update.message.reply_text("❌ Iltimos, fayl yuboring.")
+        return
+
+    file_name = document.file_name
+    ext = os.path.splitext(file_name)[1].lower()
+
+    if ext != '.doc':
+        await update.message.reply_text("❌ Iltimos, .DOC formatdagi fayl yuboring.")
+        return
+
+    processing_msg = await update.message.reply_text("⏳ DOC fayl qayta ishlanmoqda...")
+
+    try:
+        file = await context.bot.get_file(document.file_id)
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
+            await file.download_to_drive(tmp_file.name)
+            doc_path = tmp_file.name
+
+        # DOC ni DOCX ga o'tkazish uchun LibreOffice yoki boshqa vosita kerak
+        # Hozircha foydalanuvchiga qo'lda o'tkazishni tavsiya qilamiz
+        await processing_msg.edit_text(
+            "⚠️ Hozircha DOC ni DOCX ga avtomatik o'tkazish imkoniyati cheklangan.\n\n"
+            "Iltimos, faylni Microsoft Word yoki LibreOffice da ochib:\n"
+            "📁 File → Save As → .DOCX formatda saqlang\n\n"
+            "So'ng qayta yuboring.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Ortga", callback_data="back_to_main")]
+            ])
+        )
+        
+        os.unlink(doc_path)
+        context.user_data['waiting_for_doc_file'] = False
+
+    except Exception as e:
+        await processing_msg.edit_text(f"❌ Xatolik: {str(e)}")
+        context.user_data['waiting_for_doc_file'] = False
+
+
+def parse_text_content(text):
+    lines = text.strip().split('\n')
+    questions = []
+    i = 0
+
+    while i < len(lines):
+        line = lines[i].strip()
+        if line and ('?' in line or len(line) > 20):
+            q_text = line
+            options = []
+            j = i + 1
+            while j < len(lines) and len(options) < 4:
+                opt = lines[j].strip()
+                if opt and len(opt) > 1 and opt[0].upper() in 'ABCD' and len(opt) > 1 and opt[1] in ').':
+                    options.append(opt[2:].strip() if len(opt) > 2 else '')
+                elif opt and len(opt) > 1:
+                    options.append(opt)
+                j += 1
+                if len(options) >= 4:
+                    break
+
+            if len(options) == 4:
+                questions.append({
+                    'text': q_text,
+                    'options': options,
+                    'correct': 'A'
+                })
+                i = j
+            else:
+                i += 1
+        else:
+            i += 1
+
+    return questions
+
+
+def parse_html_content(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    questions = []
+
+    # Jadvaldan o'qish
+    tables = soup.find_all('table')
+    for table in tables:
+        rows = table.find_all('tr')
+        for row in rows:
+            cells = row.find_all(['td', 'th'])
+            if len(cells) >= 5:
+                q_text = cells[0].get_text().strip()
+                opts = []
+                for i in range(1, min(5, len(cells))):
+                    opt = cells[i].get_text().strip()
+                    if opt:
+                        opts.append(opt)
+
+                if len(opts) == 4 and q_text:
+                    questions.append({
+                        'text': q_text,
+                        'options': opts,
+                        'correct': 'A'
+                    })
+
+    # Matn formatida o'qish
+    if not questions:
+        text = soup.get_text()
+        questions = parse_text_content(text)
+
+    return questions
 
 
 # ==================== FLASK ROUTES ====================
 
 @app.route('/')
 def index():
-    return jsonify({"status": "ok", "bot": "Test Master Bot"})
+    return send_from_directory('.', 'index.html')
 
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy"})
+@app.route('/index.html')
+def serve_index():
+    return send_from_directory('.', 'index.html')
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -1131,6 +690,58 @@ def webhook():
         )
     return "ok", 200
 
+@app.route('/api/files/<int:user_id>')
+def get_user_files(user_id):
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        files = c.execute('''SELECT id, file_name, uploaded_at,
+                             (SELECT COUNT(*) FROM test_questions WHERE file_id = files.id) as question_count
+                             FROM files WHERE user_id = ? ORDER BY uploaded_at DESC''',
+                          (user_id,)).fetchall()
+        conn.close()
+
+        result = []
+        for f in files:
+            result.append({
+                'id': f['id'],
+                'file_name': f['file_name'],
+                'uploaded_at': f['uploaded_at'],
+                'question_count': f['question_count']
+            })
+        return jsonify({'files': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/results/<int:user_id>')
+def get_user_results(user_id):
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        results = c.execute('''SELECT tr.*, f.file_name
+                              FROM test_results tr
+                              JOIN files f ON tr.file_id = f.id
+                              WHERE tr.user_id = ?
+                              ORDER BY tr.test_date DESC''',
+                           (user_id,)).fetchall()
+        conn.close()
+
+        result = []
+        for r in results:
+            result.append({
+                'id': r['id'],
+                'file_name': r['file_name'],
+                'total_questions': r['total_questions'],
+                'correct_answers': r['correct_answers'],
+                'wrong_answers': r['wrong_answers'],
+                'skipped_answers': r['skipped_answers'],
+                'score': r['score'],
+                'test_date': r['test_date']
+            })
+        return jsonify({'results': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 # ==================== BOT SETUP ====================
 
@@ -1139,27 +750,26 @@ bot_loop = None
 
 def run_bot():
     global bot_app, bot_loop
-    
+
     bot_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(bot_loop)
-    
+
     bot_app = Application.builder().token(TOKEN).build()
-    
+
+    # Handlers
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CommandHandler("help", help_command))
     bot_app.add_handler(MessageHandler(filters.Document.ALL, handle_file))
     bot_app.add_handler(CallbackQueryHandler(button_handler))
-    
+    bot_app.add_handler(CallbackQueryHandler(handle_doc_conversion, pattern="^convert_doc$"))
+
     async def setup():
         await bot_app.initialize()
-        
-        webhook_url = WEBHOOK_URL.rstrip('/') + '/webhook'
-        await bot_app.bot.delete_webhook(drop_pending_updates=True)
+        webhook_url = WEBAPP_URL.rstrip('/') + '/webhook'
         await bot_app.bot.set_webhook(webhook_url)
         await bot_app.start()
-        
         print(f"✅ Webhook o'rnatildi: {webhook_url}")
-    
+
     bot_loop.run_until_complete(setup())
     bot_loop.run_forever()
 
@@ -1167,10 +777,13 @@ def run_bot():
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
-    print("🚀 Test Master Bot ishga tushmoqda...")
-    
+    if not TOKEN:
+        raise ValueError("TOKEN muhit o'zgaruvchisi o'rnatilmagan!")
+
+    # Bot ni alohida threadda ishga tushirish
     bot_thread = Thread(target=run_bot, daemon=True)
     bot_thread.start()
-    
-    print(f"🌐 Web server port {PORT} da ishga tushdi")
-    app.run(host='0.0.0.0', port=PORT)
+
+    # Flask ni ishga tushirish
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
