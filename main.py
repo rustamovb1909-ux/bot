@@ -50,8 +50,6 @@ CORS(app)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # DOIMIY DISK (Render.com uchun)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Render.com'da persistent disk /var/data ga mount qilinadi
-# Agar mavjud bo'lmasa, hozirgi ishchi katalogni ishlatamiz
 DATA_DIR = os.getenv("DATA_DIR", "/var/data" if os.path.isdir("/var/data") else ".")
 DATA_DIR = Path(DATA_DIR)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -72,7 +70,6 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # Yangi jadvallarni yaratamiz
     c.executescript('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -118,7 +115,6 @@ def init_db():
         );
     ''')
 
-    # Migratsiya: eski users jadvalida phone_number ustuni bo'lmasa, qo'shamiz
     c.execute("PRAGMA table_info(users)")
     cols = [row[1] for row in c.fetchall()]
     if 'phone_number' not in cols:
@@ -128,7 +124,6 @@ def init_db():
         except Exception as e:
             print(f"Migratsiya xatosi: {e}", flush=True)
 
-    # users jadvali uchun indeks
     c.execute("CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id)")
 
@@ -145,10 +140,9 @@ def get_db():
 init_db()
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# PARSER FUNKSIYALARI
+# PARSER FUNKSIYALARI (avvalgidek)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def normalize_text(s):
-    """Matnni tozalash"""
     if not s:
         return ''
     s = str(s).strip()
@@ -158,14 +152,11 @@ def normalize_text(s):
 
 
 def extract_correct_marker(text):
-    """To'g'ri javob belgisini ajratish: +, *, ✓, [to'g'ri]"""
     text = normalize_text(text)
     if not text:
         return '', False
-
     is_correct = False
     clean = text
-
     if clean.startswith('+'):
         is_correct, clean = True, clean[1:].strip()
     elif clean.startswith('*'):
@@ -180,16 +171,13 @@ def extract_correct_marker(text):
     elif clean.lower().startswith('(to') and 'gri' in clean.lower():
         is_correct = True
         clean = clean.split(')', 1)[-1].strip() if ')' in clean else clean
-
     return clean, is_correct
 
 
 def strip_option_marker(text):
-    """A) B) 1) - • markerlarini olib tashlash"""
     text = normalize_text(text)
     if not text:
         return ''
-
     m = re.match(r'^[A-Da-d][\.\)]\s*(.+)$', text)
     if m:
         return m.group(1).strip()
@@ -203,7 +191,6 @@ def strip_option_marker(text):
 
 
 def is_variant_marker(line):
-    """Bu qator variant ehtimoli"""
     if not line:
         return False
     if line[0] in '+*✓✔✅':
@@ -216,41 +203,12 @@ def is_variant_marker(line):
 
 
 def parse_text_content(text):
-    """
-    Matndan savollarni ajratish. Qo'llab-quvvatlanadigan formatlar:
-
-    FORMAT 1 — 5 ta ustunli (| yoki tab yoki vergul bilan):
-        Savol|To'g'ri|Xato1|Xato2|Xato3
-
-    FORMAT 2 — Birinchi variant to'g'ri (- bilan):
-        Savol matni
-        - To'g'ri javob
-        - Xato 1
-        - Xato 2
-        - Xato 3
-
-    FORMAT 3 — To'g'ri javob + bilan belgilangan:
-        Savol matni
-        + To'g'ri javob
-        - Xato 1
-        - Xato 2
-        - Xato 3
-
-    FORMAT 4 — A) B) C) D):
-        1. Savol matni?
-        A) To'g'ri
-        B) Xato 1
-        C) Xato 2
-        D) Xato 3
-    """
     if not text:
         return []
-
-    lines = [l for l in text.split('\n')]
-    lines = [normalize_text(l) for l in lines if normalize_text(l)]
+    lines = [normalize_text(l) for l in text.split('\n') if normalize_text(l)]
     questions = []
 
-    # FORMAT 1: 5 ta ustunli (|, \t, yoki ; bilan ajratilgan)
+    # Format 1: 5 ustunli
     format1_found = False
     for line in lines:
         parts = None
@@ -276,11 +234,10 @@ def parse_text_content(text):
                     'correct': 'A',
                 })
                 format1_found = True
-
     if format1_found:
         return questions
 
-    # FORMAT 2-4: Savol + variantlar bloki (lookahead)
+    # Format 2-4
     classified = []
     for idx, line in enumerate(lines):
         if is_variant_marker(line):
@@ -288,27 +245,22 @@ def parse_text_content(text):
         else:
             classified.append((line, False))
 
-    # Lookahead: keyingi qatorlarda variantlar bor-yo'qligini tekshirish
     fixed = []
     for idx, (line, is_opt) in enumerate(classified):
         if is_opt:
             fixed.append((line, True))
             continue
-        # Bu "savol" — keyingi 7 qator ichida 2+ variant bormi?
         next_count = sum(1 for j in range(idx + 1, min(idx + 7, len(classified))) if classified[j][1])
         if next_count >= 2:
             fixed.append((line, False))
         elif '?' in line or len(line) > 50:
             fixed.append((line, False))
         else:
-            # Qisqa matn — variant deb hisoblaymiz
             fixed.append((line, True))
 
-    # Bloklarga ajratish
     blocks = []
     current_q = None
     current_opts = []
-
     for line_clean, is_option in fixed:
         if is_option:
             current_opts.append(line_clean)
@@ -317,33 +269,25 @@ def parse_text_content(text):
                 blocks.append((current_q, current_opts))
                 current_opts = []
             current_q = line_clean
-
     if current_q is not None and current_opts:
         blocks.append((current_q, current_opts))
 
-    # Bloklarni qayta ishlash
     for q_text, opts_lines in blocks:
         if not q_text:
             continue
-
         options = []
         correct_idx = 0
         found_explicit = False
-
         for opt_line in opts_lines:
             clean_opt, is_correct = extract_correct_marker(opt_line)
             clean_opt = strip_option_marker(clean_opt)
             if not clean_opt:
                 continue
-
             options.append(clean_opt)
             if is_correct and not found_explicit:
                 correct_idx = len(options) - 1
                 found_explicit = True
-
-        # Savol matnidan raqamni tozalash
         q_text = re.sub(r'^\d{1,3}[\.\)]\s*', '', q_text).strip()
-
         if len(options) >= 2 and q_text:
             while len(options) < 4:
                 options.append('')
@@ -352,19 +296,14 @@ def parse_text_content(text):
                 'options': options[:4],
                 'correct': chr(ord('A') + correct_idx) if correct_idx < 4 else 'A',
             })
-
     return questions
 
 
 def parse_html_content(html):
-    """DOCX dan olingan HTML dan savollarni ajratish"""
     if not html:
         return []
-
     soup = BeautifulSoup(html, 'html.parser')
     questions = []
-
-    # 5 ta ustunli jadval
     tables = soup.find_all('table')
     for table in tables:
         rows = table.find_all('tr')
@@ -375,7 +314,6 @@ def parse_html_content(html):
                 correct = normalize_text(cells[1].get_text())
                 wrong = [normalize_text(cells[i].get_text()) for i in range(2, min(5, len(cells)))]
                 wrong = [w for w in wrong if w]
-
                 if q_text and correct and wrong:
                     all_opts = [correct] + wrong[:3]
                     while len(all_opts) < 4:
@@ -385,20 +323,16 @@ def parse_html_content(html):
                         'options': all_opts[:4],
                         'correct': 'A',
                     })
-
     if not questions:
-        # Matn formatida
         text = soup.get_text('\n')
         questions = parse_text_content(text)
-
     return questions
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TELEGRAM BOT HANDLERLARI
+# TELEGRAM BOT HANDLERLARI (o'zgarishsiz)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def md_escape(text):
-    """Foydalanuvchi matnidan Markdown uchun xavfli belgilarni olib tashlash"""
     if not text:
         return ''
     bad_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '|', '{', '}']
@@ -408,7 +342,6 @@ def md_escape(text):
 
 
 def html_escape(text):
-    """HTML uchun xavfli belgilarni escape qilish"""
     if not text:
         return ''
     text = str(text)
@@ -417,11 +350,9 @@ def html_escape(text):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/start — telefon raqam so'rash yoki asosiy menyu"""
     user = update.effective_user
     if not user:
         return
-
     try:
         conn = get_db()
         c = conn.cursor()
@@ -430,16 +361,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (user.id, user.username, user.first_name, user.last_name),
         )
         conn.commit()
-
         row = c.execute('SELECT phone_number FROM users WHERE user_id = ?', (user.id,)).fetchone()
         phone = (row['phone_number'] if row else None) or ''
         conn.close()
     except Exception as e:
         print(f"start DB error: {e}", flush=True)
         phone = None
-
     if not phone:
-        # Telefon raqam so'raymiz
         kb = ReplyKeyboardMarkup(
             [[KeyboardButton("📱 Telefon raqamni ulashish", request_contact=True)]],
             resize_keyboard=True,
@@ -458,7 +386,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def send_main_menu(update, first_name):
-    """Asosiy menyu — tugmalar"""
     safe_name = html_escape(first_name or 'foydalanuvchi')
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
@@ -488,23 +415,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Telefon raqam qabul qilish"""
     user = update.effective_user
     contact = update.message.contact if update.message else None
-
     if not contact or not user:
         return
-
     if contact.user_id and contact.user_id != user.id:
         await update.message.reply_text("❌ Iltimos, o'z telefon raqamingizni ulashing.")
         return
-
     phone = contact.phone_number
-
     try:
         conn = get_db()
         c = conn.cursor()
-        # Avval user borligini tekshiramiz
         c.execute('SELECT 1 FROM users WHERE user_id = ?', (user.id,))
         exists = c.fetchone()
         if exists:
@@ -521,8 +442,6 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"contact_handler DB error: {e}", flush=True)
         await update.message.reply_text("❌ Telefon raqamni saqlashda xatolik. Qayta urinib ko'ring.")
         return
-
-    # Reply keyboardni olib tashlaymiz
     remove_kb = ReplyKeyboardMarkup([[]], resize_keyboard=True)
     await update.message.reply_text(
         f"✅ Telefon raqam saqlandi: {phone}\n\nEndi botdan to'liq foydalanishingiz mumkin!",
@@ -532,11 +451,9 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Inline tugmalar"""
     query = update.callback_query
     await query.answer()
     data = query.data or ""
-
     if data == "upload_file":
         await query.edit_message_text(
             "📤 <b>Test faylini yuboring</b>\n\n"
@@ -557,13 +474,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML",
         )
         context.user_data['waiting_for_file'] = True
-
     elif data == "my_tests":
         await show_user_tests(query)
-
     elif data == "my_results":
         await show_user_results(query)
-
     elif data == "help":
         await query.edit_message_text(
             "📖 <b>Yordam</b>\n\n"
@@ -576,7 +490,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("🔙 Orqaga", callback_data="back_to_main")
             ]]),
         )
-
     elif data == "back_to_main":
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
@@ -586,12 +499,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💡 Yordam", callback_data="help")],
         ])
         await query.edit_message_text("👋 Asosiy menyu:", reply_markup=kb)
-        # Xabarni edit qilgandan keyin yangi xabar yuborishimiz kerak emas,
-        # chunki edit_message_text o'rniga boshqa menyuga o'tkazamiz
 
 
 async def show_user_tests(query):
-    """Foydalanuvchi testlari"""
     user_id = query.from_user.id
     conn = get_db()
     c = conn.cursor()
@@ -602,24 +512,19 @@ async def show_user_tests(query):
         (user_id,),
     ).fetchall()
     conn.close()
-
     kb_back = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Orqaga", callback_data="back_to_main")]])
-
     if not files:
         await query.edit_message_text("📂 Siz hali hech qanday test yuklamagansiz.", reply_markup=kb_back)
         return
-
     text = "📚 <b>Mening testlarim:</b>\n\n"
     for i, f in enumerate(files[:20], 1):
         date = (f['uploaded_at'] or '')[:10]
         name = md_escape(f['original_name'] or 'Nomsiz')
         text += f"{i}. <b>{name}</b> — {f['cnt']} ta savol\n   📅 {date}\n\n"
-
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb_back)
 
 
 async def show_user_results(query):
-    """Natijalar"""
     user_id = query.from_user.id
     conn = get_db()
     c = conn.cursor()
@@ -632,13 +537,10 @@ async def show_user_results(query):
         (user_id,),
     ).fetchall()
     conn.close()
-
     kb_back = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Orqaga", callback_data="back_to_main")]])
-
     if not rows:
         await query.edit_message_text("📊 Hali natijalar yo'q. Avval test topshiring.", reply_markup=kb_back)
         return
-
     text = "📊 <b>Oxirgi 10 ta natija:</b>\n\n"
     for r in rows:
         date = (r['test_date'] or '')[:16]
@@ -650,15 +552,13 @@ async def show_user_results(query):
             f"   ✅ {r['correct_answers']} | ❌ {r['wrong_answers']} | ⏭️ {r['skipped_answers']}\n"
             f"   📊 Ball: <b>{r['score']}%</b>\n\n"
         )
-
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb_back)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# FAYL QAYTA ISHLASH
+# FAYL QAYTA ISHLASH (bot uchun)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def convert_doc_to_docx(doc_path):
-    """LibreOffice yordamida .doc -> .docx konvertatsiya (sinxron)"""
     try:
         out_dir = tempfile.mkdtemp()
         cmd = ['libreoffice', '--headless', '--convert-to', 'docx', '--outdir', out_dir, doc_path]
@@ -681,7 +581,6 @@ def convert_doc_to_docx(doc_path):
 
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Fayl qabul qilish va qayta ishlash"""
     if not context.user_data.get('waiting_for_file'):
         await update.message.reply_text(
             "❗ Avval '📤 Test fayl yuklash' tugmasini bosing.",
@@ -690,30 +589,23 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]]),
         )
         return
-
     msg = update.message
     if not msg or not msg.document:
         await update.message.reply_text("❌ Iltimos, fayl yuboring.")
         return
-
     doc = msg.document
     file_name = doc.file_name or "test.txt"
     file_size = doc.file_size or 0
     ext = os.path.splitext(file_name)[1].lower()
-
     if ext not in ('.txt', '.docx', '.doc'):
         await update.message.reply_text(
             f"❌ '{ext}' formati qo'llab-quvvatlanmaydi.\nFaqat .txt, .docx, .doc fayllar."
         )
         return
-
     if file_size > 20 * 1024 * 1024:
         await update.message.reply_text("❌ Fayl 20 MB dan oshmasligi kerak.")
         return
-
     processing_msg = await update.message.reply_text("⏳ Fayl qayta ishlanmoqda...")
-
-    # Faylni yuklab olish
     try:
         tg_file = await context.bot.get_file(doc.file_id)
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
@@ -723,11 +615,9 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"❌ Download error: {e}", flush=True)
         await processing_msg.edit_text("❌ Yuklab olishda xatolik. Qayta urinib ko'ring.")
         return
-
     converted_path = None
     convert_dir = None
     try:
-        # .doc -> .docx konvertatsiya
         if ext == '.doc':
             await processing_msg.edit_text("🔄 .doc → .docx konvertatsiya...")
             converted_path, convert_dir = convert_doc_to_docx(tmp_path)
@@ -743,13 +633,9 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
                 return
-
-        # Savollarni ajratish
         read_path = converted_path or tmp_path
         read_ext = '.docx' if converted_path else ext
-
         await processing_msg.edit_text("📖 Savollar ajratilmoqda...")
-
         if read_ext == '.txt':
             with open(read_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
@@ -759,7 +645,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 result = mammoth.convert_to_html(f)
                 html = result.value
             questions = parse_html_content(html)
-
         if not questions:
             await processing_msg.edit_text(
                 "❌ Fayldan savollar topilmadi.\n\n"
@@ -776,15 +661,11 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
             )
             return
-
-        # Faylni saqlash
         upload_dir = UPLOADS_DIR
         upload_dir.mkdir(parents=True, exist_ok=True)
-
         save_name = file_name[:-4] + '.docx' if ext == '.doc' else file_name
         unique_name = f"{update.effective_user.id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{save_name}"
         file_path = upload_dir / unique_name
-
         if converted_path and os.path.exists(converted_path):
             shutil.move(converted_path, str(file_path))
             if convert_dir and os.path.exists(convert_dir):
@@ -792,8 +673,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             if os.path.exists(tmp_path):
                 shutil.move(tmp_path, str(file_path))
-
-        # Database ga yozish
         user_id = update.effective_user.id
         conn = get_db()
         c = conn.cursor()
@@ -803,7 +682,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (user_id, unique_name, str(file_path), file_size, save_name),
         )
         db_file_id = c.lastrowid
-
         for q in questions:
             opts = (q['options'] + ['', '', '', ''])[:4]
             c.execute(
@@ -812,15 +690,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
                 (db_file_id, q['text'], opts[0], opts[1], opts[2], opts[3], q['correct']),
             )
-
         conn.commit()
         conn.close()
-
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("🌐 Testni boshlash", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
             [InlineKeyboardButton("🔙 Asosiy menyu", callback_data="back_to_main")],
         ])
-
         await processing_msg.edit_text(
             f"✅ <b>Fayl saqlandi!</b>\n\n"
             f"📄 {md_escape(save_name)}\n"
@@ -830,7 +705,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=kb,
         )
         context.user_data['waiting_for_file'] = False
-
     except Exception as e:
         print(f"❌ handle_file error: {e}", flush=True)
         import traceback
@@ -851,7 +725,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# FLASK API ROUTES
+# FLASK API ROUTES (YANGILANGAN)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @app.route('/')
 def index():
@@ -868,10 +742,134 @@ def healthz():
     return jsonify({"status": "ok"}), 200
 
 
-@app.route('/api/tests/<int:user_id>')
-def api_user_tests(user_id):
-    """Foydalanuvchining testlari ro'yxati"""
+# YANGI: /api/upload — faylni qabul qilish va parse qilish
+@app.route('/api/upload', methods=['POST'])
+def api_upload():
+    """WebApp dan fayl yuklash"""
     try:
+        # userId ni form yoki JSON dan olish
+        user_id = request.form.get('userId')
+        if not user_id:
+            # Agar form da bo'lmasa, JSON dan tekshiramiz
+            data = request.get_json(silent=True) or {}
+            user_id = data.get('userId')
+        if not user_id:
+            return jsonify({'error': 'userId kerak'}), 400
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            return jsonify({'error': 'userId noto‘g‘ri'}), 400
+
+        if 'file' not in request.files:
+            return jsonify({'error': 'Fayl yuborilmadi'}), 400
+        file = request.files['file']
+        if not file.filename:
+            return jsonify({'error': 'Fayl tanlanmagan'}), 400
+
+        # Faylni vaqtinchalik saqlaymiz
+        file_name = file.filename
+        ext = os.path.splitext(file_name)[1].lower()
+        if ext not in ('.txt', '.docx', '.doc'):
+            return jsonify({'error': f"'{ext}' formati qo'llab-quvvatlanmaydi. Faqat .txt, .docx, .doc"}), 400
+
+        # Faylni diskka vaqtinchalik yozamiz
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+
+        converted_path = None
+        convert_dir = None
+
+        # .doc -> .docx konvertatsiya
+        if ext == '.doc':
+            converted_path, convert_dir = convert_doc_to_docx(tmp_path)
+            if not converted_path:
+                return jsonify({'error': ".doc faylni o'qib bo'lmadi. DOCX formatida yuboring."}), 400
+
+        read_path = converted_path or tmp_path
+        read_ext = '.docx' if converted_path else ext
+
+        # Savollarni ajratish
+        if read_ext == '.txt':
+            with open(read_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            questions = parse_text_content(content)
+        else:
+            with open(read_path, 'rb') as f:
+                result = mammoth.convert_to_html(f)
+                html = result.value
+            questions = parse_html_content(html)
+
+        # Tozalash
+        for p in [tmp_path, converted_path]:
+            if p and os.path.exists(p):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+        if convert_dir and os.path.exists(convert_dir):
+            shutil.rmtree(convert_dir, ignore_errors=True)
+
+        if not questions:
+            return jsonify({'error': "Fayldan savollar topilmadi. Formatni tekshiring."}), 400
+
+        # Faylni doimiy saqlash
+        save_name = file_name[:-4] + '.docx' if ext == '.doc' else file_name
+        unique_name = f"{user_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{save_name}"
+        file_path = UPLOADS_DIR / unique_name
+
+        # Asl faylni (konvert qilingan yoki original) ko'chirish
+        src = converted_path if converted_path else tmp_path
+        if os.path.exists(src):
+            shutil.copy2(src, str(file_path))
+
+        file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(
+            '''INSERT INTO files (user_id, file_name, file_path, file_size, original_name)
+               VALUES (?, ?, ?, ?, ?)''',
+            (user_id, unique_name, str(file_path), file_size, save_name),
+        )
+        db_file_id = c.lastrowid
+
+        for q in questions:
+            opts = (q['options'] + ['', '', '', ''])[:4]
+            c.execute(
+                '''INSERT INTO test_questions
+                   (file_id, question_text, option_a, option_b, option_c, option_d, correct_answer)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (db_file_id, q['text'], opts[0], opts[1], opts[2], opts[3], q['correct']),
+            )
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'ok': True,
+            'file_id': db_file_id,
+            'questions_count': len(questions),
+            'original_name': file_name,
+        })
+    except Exception as e:
+        print(f"❌ api_upload error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# YANGI: /api/tests — GET, userId query parametr
+@app.route('/api/tests')
+def api_user_tests():
+    try:
+        user_id = request.args.get('userId')
+        if not user_id:
+            return jsonify({'error': 'userId kerak'}), 400
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            return jsonify({'error': 'userId noto‘g‘ri'}), 400
+
         conn = get_db()
         c = conn.cursor()
         rows = c.execute(
@@ -887,12 +885,58 @@ def api_user_tests(user_id):
         return jsonify({'tests': [], 'error': str(e)}), 200
 
 
-@app.route('/api/test/<int:file_id>')
-def api_test_questions(file_id):
-    """Test savollari"""
+# YANGI: /api/results — GET, userId query parametr
+@app.route('/api/results')
+def api_user_results():
     try:
+        user_id = request.args.get('userId')
+        if not user_id:
+            return jsonify({'error': 'userId kerak'}), 400
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            return jsonify({'error': 'userId noto‘g‘ri'}), 400
+
         conn = get_db()
         c = conn.cursor()
+        rows = c.execute(
+            '''SELECT tr.*, f.file_name
+               FROM test_results tr
+               JOIN files f ON tr.file_id = f.id
+               WHERE tr.user_id = ?
+               ORDER BY tr.test_date DESC LIMIT 20''',
+            (user_id,),
+        ).fetchall()
+        conn.close()
+        return jsonify({'results': [dict(r) for r in rows]})
+    except Exception as e:
+        print(f"❌ api/results error: {e}", flush=True)
+        return jsonify({'results': [], 'error': str(e)}), 200
+
+
+# /api/test/<file_id> — userId query parametr tekshiruvi qo'shildi (ixtiyoriy)
+@app.route('/api/test/<int:file_id>')
+def api_test_questions(file_id):
+    try:
+        user_id = request.args.get('userId')
+        if not user_id:
+            return jsonify({'error': 'userId kerak'}), 400
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            return jsonify({'error': 'userId noto‘g‘ri'}), 400
+
+        conn = get_db()
+        c = conn.cursor()
+        # Fayl foydalanuvchiga tegishli ekanligini tekshiramiz
+        file_row = c.execute(
+            'SELECT id FROM files WHERE id = ? AND user_id = ?',
+            (file_id, user_id),
+        ).fetchone()
+        if not file_row:
+            conn.close()
+            return jsonify({'error': 'Test topilmadi'}), 404
+
         rows = c.execute(
             '''SELECT question_text, option_a, option_b, option_c, option_d, correct_answer
                FROM test_questions WHERE file_id = ?''',
@@ -903,7 +947,6 @@ def api_test_questions(file_id):
         questions = []
         for r in rows:
             opts = [r['option_a'] or '', r['option_b'] or '', r['option_c'] or '', r['option_d'] or '']
-            # Bo'sh variantlarni olib tashlaymiz, lekin original indekslarni saqlaymiz
             non_empty = [(i, o) for i, o in enumerate(opts) if o and o.strip()]
             if len(non_empty) < 2:
                 continue
@@ -914,7 +957,6 @@ def api_test_questions(file_id):
                 original_correct_idx = 0
             if original_correct_idx < 0 or original_correct_idx > 3:
                 original_correct_idx = 0
-            # Yangi siqilgan ro'yxatda to'g'ri javobning indeksini topamiz
             new_correct_idx = None
             correct_text = None
             for new_idx, (orig_idx, txt) in enumerate(non_empty):
@@ -923,7 +965,6 @@ def api_test_questions(file_id):
                     correct_text = txt
                     break
             if new_correct_idx is None:
-                # To'g'ri javob ro'yxatda yo'q — birinchi variantni olamiz
                 new_correct_idx = 0
                 correct_text = non_empty[0][1]
             cleaned_opts = [txt for _, txt in non_empty]
@@ -931,7 +972,7 @@ def api_test_questions(file_id):
                 'text': r['question_text'],
                 'options': cleaned_opts,
                 'correct': new_correct_idx,
-                'correct_text': correct_text,  # Aralashtirish uchun zaxira matn
+                'correct_text': correct_text,
             })
         return jsonify({'questions': questions})
     except Exception as e:
@@ -939,9 +980,9 @@ def api_test_questions(file_id):
         return jsonify({'questions': [], 'error': str(e)}), 200
 
 
+# /api/save_result — allaqachon mavjud, userId body dan olinadi (o'zgarmaydi)
 @app.route('/api/save_result', methods=['POST'])
 def api_save_result():
-    """Test natijasini saqlash"""
     try:
         data = request.get_json(silent=True) or {}
         user_id = data.get('user_id')
@@ -973,30 +1014,11 @@ def api_save_result():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/results/<int:user_id>')
-def api_user_results(user_id):
-    """Foydalanuvchi natijalari"""
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        rows = c.execute(
-            '''SELECT tr.*, f.file_name
-               FROM test_results tr
-               JOIN files f ON tr.file_id = f.id
-               WHERE tr.user_id = ?
-               ORDER BY tr.test_date DESC LIMIT 20''',
-            (user_id,),
-        ).fetchall()
-        conn.close()
-        return jsonify({'results': [dict(r) for r in rows]})
-    except Exception as e:
-        print(f"❌ api/results error: {e}", flush=True)
-        return jsonify({'results': [], 'error': str(e)}), 200
-
-
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# WEBHOOK
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    """Telegram webhook"""
     try:
         json_data = request.get_json(force=True, silent=True)
         if json_data and bot_app and bot_loop:
@@ -1019,9 +1041,7 @@ bot_loop = None
 
 
 def run_bot():
-    """Botni alohida thread'da ishga tushirish"""
     global bot_app, bot_loop
-
     bot_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(bot_loop)
 
@@ -1035,18 +1055,15 @@ def run_bot():
     async def setup():
         try:
             await bot_app.initialize()
-
             await bot_app.bot.set_my_commands([
                 BotCommand("start", "Botni ishga tushirish"),
                 BotCommand("help", "Yordam"),
             ])
-
             webhook_url = None
             if RENDER_EXTERNAL_URL:
                 webhook_url = RENDER_EXTERNAL_URL.rstrip('/') + '/webhook'
             elif os.getenv("WEBHOOK_URL"):
                 webhook_url = os.getenv("WEBHOOK_URL").rstrip('/') + '/webhook'
-
             if webhook_url:
                 await bot_app.bot.delete_webhook(drop_pending_updates=True)
                 await bot_app.bot.set_webhook(
@@ -1060,9 +1077,7 @@ def run_bot():
                 await bot_app.start()
                 await bot_app.updater.start_polling(drop_pending_updates=True)
                 print("✅ Polling rejimida", flush=True)
-
             print("✅ Bot tayyor!", flush=True)
-
         except Exception as e:
             print(f"❌ Bot setup error: {e}", flush=True)
             import traceback
