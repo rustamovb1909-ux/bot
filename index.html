@@ -40,7 +40,6 @@
         body { padding: 14px 12px 90px; }
         .app { width: 100%; max-width: 520px; margin: 0 auto; }
 
-        /* ━━━ HEADER ━━━ */
         .header {
             display: flex; align-items: center; justify-content: space-between;
             padding: 6px 4px 18px;
@@ -81,7 +80,6 @@
             max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
 
-        /* ━━━ QUICK ACTIONS ━━━ */
         .quick-actions {
             display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
             margin-bottom: 22px;
@@ -120,7 +118,6 @@
         .quick-card .qa-sub { font-size: 11px; color: var(--text-dim); }
         .quick-card > * { position: relative; z-index: 1; }
 
-        /* ━━━ SECTIONS ━━━ */
         .section {
             margin-bottom: 22px;
         }
@@ -144,7 +141,6 @@
             font-weight: 600;
         }
 
-        /* ━━━ TEST CARDS ━━━ */
         .tests-grid { display: flex; flex-direction: column; gap: 10px; }
         .test-card {
             background: var(--card);
@@ -199,7 +195,6 @@
             box-shadow: 0 4px 12px var(--accent-glow);
         }
 
-        /* ━━━ EMPTY / LOADING ━━━ */
         .empty-state {
             text-align: center; padding: 50px 20px;
             background: var(--card); border: 1px dashed var(--border);
@@ -220,7 +215,6 @@
         .loader.lg { width: 36px; height: 36px; border-width: 3px; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ━━━ PAGE TRANSITIONS ━━━ */
         .page { display: none; }
         .page.active { display: block; animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
         @keyframes slideUp {
@@ -228,7 +222,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ━━━ COUNT PAGE ━━━ */
         .selected-file-info {
             background: var(--card); border: 1px solid var(--border);
             border-radius: 14px; padding: 14px 16px;
@@ -282,7 +275,6 @@
             background: var(--accent); border-color: var(--accent); color: #fff;
         }
 
-        /* ━━━ BUTTONS ━━━ */
         .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
             padding: 14px 20px; border-radius: 14px;
@@ -316,7 +308,6 @@
         .btn-row .btn { flex: 1; }
         .btn-row .btn-back { flex: 0 0 auto; padding: 14px 18px; }
 
-        /* ━━━ TEST PAGE ━━━ */
         .test-top {
             display: flex; align-items: center; justify-content: space-between;
             gap: 10px; margin-bottom: 16px;
@@ -431,7 +422,6 @@
 
         .option.faded { opacity: 0.45; }
 
-        /* ━━━ NAVIGATION ━━━ */
         .nav-section {
             background: var(--card); border: 1px solid var(--border);
             border-radius: 16px; padding: 14px;
@@ -458,7 +448,6 @@
         .nav-btn.correct { background: var(--green); border-color: var(--green); color: #fff; }
         .nav-btn.wrong { background: var(--red); border-color: var(--red); color: #fff; }
 
-        /* ━━━ RESULTS ━━━ */
         .results-hero {
             background: var(--card);
             border: 1px solid var(--border);
@@ -513,7 +502,6 @@
             margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px;
         }
 
-        /* ━━━ TOAST ━━━ */
         .toast {
             position: fixed; bottom: 24px; left: 50%;
             transform: translateX(-50%) translateY(20px);
@@ -526,6 +514,25 @@
         }
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+        /* upload status */
+        .upload-status {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* hidden file input */
+        #fileInput {
+            display: none;
+        }
+
         @media (max-width: 480px) {
             body { padding: 10px 8px 80px; }
             .question-card { padding: 14px; }
@@ -537,7 +544,7 @@
 
 <div class="app">
 
-    <!-- ━━━ HEADER ━━━ -->
+    <!-- HEADER -->
     <header class="header">
         <div class="logo">
             <div class="logo-icon"><i class="fas fa-graduation-cap"></i></div>
@@ -552,9 +559,8 @@
         </div>
     </header>
 
-    <!-- ━━━ ASOSIY SAHIFA ━━━ -->
+    <!-- HOME -->
     <div class="page active" id="pageHome">
-        <!-- Quick actions -->
         <div class="quick-actions">
             <div class="quick-card" id="qaStart">
                 <div class="qa-icon purple"><i class="fas fa-play"></i></div>
@@ -564,7 +570,7 @@
             <div class="quick-card" id="qaUpload">
                 <div class="qa-icon green"><i class="fas fa-cloud-upload-alt"></i></div>
                 <div class="qa-title">Yuklash</div>
-                <div class="qa-sub">Bot orqali</div>
+                <div class="qa-sub">Fayl tanlash</div>
             </div>
             <div class="quick-card" id="qaResults">
                 <div class="qa-icon orange"><i class="fas fa-chart-line"></i></div>
@@ -578,7 +584,10 @@
             </div>
         </div>
 
-        <!-- Tests section -->
+        <!-- File input (hidden) -->
+        <input type="file" id="fileInput" accept=".txt,.docx,.doc" />
+        <div id="uploadStatus" class="upload-status" style="display:none;"></div>
+
         <div class="section">
             <div class="section-head">
                 <div class="title"><i class="fas fa-book"></i> Mening testlarim</div>
@@ -593,7 +602,7 @@
         </div>
     </div>
 
-    <!-- ━━━ SAVOLLAR SONI ━━━ -->
+    <!-- COUNT -->
     <div class="page" id="pageCount">
         <div class="section-head">
             <div class="title"><i class="fas fa-sliders-h"></i> Sozlamalar</div>
@@ -638,7 +647,7 @@
         </button>
     </div>
 
-    <!-- ━━━ TEST ━━━ -->
+    <!-- TEST -->
     <div class="page" id="pageTest">
         <div class="test-top">
             <button class="exit-btn" id="exitTestBtn" title="Chiqish"><i class="fas fa-times"></i></button>
@@ -671,7 +680,7 @@
         </div>
     </div>
 
-    <!-- ━━━ NATIJALAR ━━━ -->
+    <!-- RESULTS -->
     <div class="page" id="pageResults">
         <div class="results-hero">
             <div class="score-circle">
@@ -721,19 +730,28 @@
 <script>
 'use strict';
 
-// ━━━ TELEGRAM ━━━
+// ━━━ TELEGRAM & USER ID ━━━
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
 const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
-const tgUserId = tgUser ? tgUser.id : null;
+let tgUserId = tgUser ? tgUser.id : null;
 const tgUserName = tgUser ? (tgUser.first_name || 'Foydalanuvchi') : 'Brauzer';
 
-if (tgUser) {
-    document.getElementById('userAvatar').textContent = tgUserName[0].toUpperCase();
-    document.getElementById('userName').textContent = tgUserName;
-    document.getElementById('userSubtitle').textContent = `${tgUserName} · Imtihon platformasi`;
+// Agar Telegram dan foydalanuvchi bo'lmasa, localStorage dan ID olamiz yoki yangi yaratamiz
+if (!tgUserId) {
+    let storedId = localStorage.getItem('userId');
+    if (!storedId) {
+        storedId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        localStorage.setItem('userId', storedId);
+    }
+    tgUserId = storedId;
 }
+
+// UI ga user ma'lumotlarini chiqaramiz
+document.getElementById('userAvatar').textContent = tgUserName[0].toUpperCase();
+document.getElementById('userName').textContent = tgUserName;
+document.getElementById('userSubtitle').textContent = `${tgUserName} · Imtihon platformasi`;
 
 // ━━━ STATE ━━━
 const state = {
@@ -747,7 +765,7 @@ const state = {
     seconds: 0,
     isFinished: false,
     isLocked: false,
-    autoAdvanceTimeout: null,   // 🟢 YANGI: avtomatik o‘tish taymeri
+    autoAdvanceTimeout: null,
 };
 
 const API = window.location.origin;
@@ -790,17 +808,13 @@ function showPage(id) {
 
 // ━━━ TESTS LOAD ━━━
 async function loadTests() {
-    if (!tgUserId) {
-        renderEmpty('Telegram orqali kiring', 'Botni qayta oching');
-        return;
-    }
     try {
         const resp = await fetch(`${API}/api/tests/${tgUserId}`);
         const data = await resp.json();
         state.tests = data.tests || [];
         document.getElementById('testsCount').textContent = state.tests.length;
         if (state.tests.length === 0) {
-            renderEmpty('Hozircha test yoʻq', 'Botga .txt, .docx yoki .doc fayl yuboring');
+            renderEmpty('Hozircha test yoʻq', '"Yuklash" tugmasini bosing va fayl tanlang');
         } else {
             renderTests();
         }
@@ -857,6 +871,51 @@ function renderTests() {
     });
 }
 
+// ━━━ UPLOAD FILE ━━━
+const fileInput = document.getElementById('fileInput');
+const uploadStatus = document.getElementById('uploadStatus');
+
+document.getElementById('qaUpload').addEventListener('click', () => {
+    fileInput.click();
+});
+
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    uploadStatus.style.display = 'flex';
+    uploadStatus.innerHTML = '<div class="loader"></div> <span style="margin-left:8px;">' + escapeHtml(file.name) + ' yuklanmoqda...</span>';
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('userId', tgUserId);  // user ID ni backendga yuboramiz
+
+        const resp = await fetch(`${API}/api/upload`, {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            uploadStatus.innerHTML =
+                `<i class="fas fa-check-circle" style="color:var(--green);"></i> <span>${data.questions_count} ta savol topildi!</span>`;
+            setTimeout(() => { uploadStatus.style.display = 'none'; }, 3000);
+            showToast(`✅ ${data.original_name}: ${data.questions_count} ta savol`);
+            loadTests();
+        } else {
+            uploadStatus.innerHTML =
+                `<i class="fas fa-times-circle" style="color:var(--red);"></i> <span>${escapeHtml(data.error || 'Xatolik')}</span>`;
+            setTimeout(() => { uploadStatus.style.display = 'none'; }, 4000);
+        }
+    } catch (err) {
+        uploadStatus.innerHTML =
+            `<i class="fas fa-times-circle" style="color:var(--red);"></i> <span>Server xatosi</span>`;
+        setTimeout(() => { uploadStatus.style.display = 'none'; }, 4000);
+    } finally {
+        fileInput.value = '';
+    }
+});
+
 // ━━━ LOAD QUESTIONS ━━━
 async function loadTestQuestions(testId) {
     try {
@@ -907,7 +966,6 @@ document.getElementById('startTestBtn').addEventListener('click', async () => {
         const shuffledOpts = shuffle(realOptions);
         let newCorrect = shuffledOpts.indexOf(correctText);
         if (newCorrect === -1) {
-            // Matn bo'yicha topilmasa, eski indeksni ishlatamiz
             newCorrect = Math.min(q.correct || 0, shuffledOpts.length - 1);
             if (newCorrect < 0) newCorrect = 0;
         }
@@ -1004,14 +1062,11 @@ function handleOptionClick(optEl, q) {
     lockOptions(q, i);
     renderNav();
 
-    console.log('Tanlangan:', i, 'To\'g\'ri:', q.correct, 'Matn:', q.options[i], '/ To\'g\'ri matn:', q.options[q.correct]);
-
-    // 🟢 AVVALGI TAYMERNI TO'XTATISH VA YANGISINI BOSHLASH
     if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
     state.autoAdvanceTimeout = setTimeout(() => {
         if (state.currentIndex < state.questions.length - 1 && !state.isFinished) {
             state.currentIndex++;
-            state.isLocked = false;      // 🟢 KEYINGI SAVOL UCHUN QULFNI OCHISH
+            state.isLocked = false;
             renderQuestion();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -1055,7 +1110,6 @@ function renderNav() {
     document.querySelectorAll('.nav-btn').forEach(b => {
         b.addEventListener('click', () => {
             if (state.isFinished) return;
-            // 🟢 QO'LDA O'TISHDA AVTO-O'TISH TAYMERINI TO'XTATISH
             if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
             state.currentIndex = parseInt(b.dataset.i);
             state.isLocked = false;
@@ -1073,7 +1127,6 @@ function finishTest() {
     }
     state.isFinished = true;
     if (state.timerInterval) clearInterval(state.timerInterval);
-    // 🟢 TAYMERNI TO'XTATISH
     if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
 
     let correct = 0, wrong = 0, skipped = 0;
@@ -1133,7 +1186,6 @@ document.getElementById('finishTestBtn').addEventListener('click', finishTest);
 document.getElementById('exitTestBtn').addEventListener('click', () => {
     if (state.isFinished || confirm('Chiqmoqchimisiz? Javoblar saqlanmaydi.')) {
         if (state.timerInterval) clearInterval(state.timerInterval);
-        // 🟢 CHIQISHDA HAM TAYMERNI TO'XTATISH
         if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
         state.isFinished = true;
         showPage('pageHome');
@@ -1141,7 +1193,6 @@ document.getElementById('exitTestBtn').addEventListener('click', () => {
 });
 document.getElementById('restartBtn').addEventListener('click', () => {
     if (state.timerInterval) clearInterval(state.timerInterval);
-    // 🟢 QAYTA BOSHLASHDA HAM TAYMERNI TO'XTATISH
     if (state.autoAdvanceTimeout) clearTimeout(state.autoAdvanceTimeout);
     state.isFinished = false;
     state.questions = [];
@@ -1159,7 +1210,6 @@ document.getElementById('qaStart').addEventListener('click', () => {
         showToast('Avval test yuklang');
         return;
     }
-    // Birinchi testni tanlash
     const first = state.tests[0];
     state.selectedTestId = first.id;
     document.getElementById('selectedFileName').textContent = first.name;
@@ -1167,11 +1217,8 @@ document.getElementById('qaStart').addEventListener('click', () => {
     document.getElementById('startTestBtn').disabled = false;
     showPage('pageCount');
 });
-document.getElementById('qaUpload').addEventListener('click', () => {
-    showToast('Botga .txt, .docx yoki .doc fayl yuboring');
-});
+
 document.getElementById('qaResults').addEventListener('click', async () => {
-    if (!tgUserId) return;
     try {
         const resp = await fetch(`${API}/api/results/${tgUserId}`);
         const data = await resp.json();
@@ -1187,8 +1234,9 @@ document.getElementById('qaResults').addEventListener('click', async () => {
         showToast(text);
     } catch (e) { console.error(e); }
 });
+
 document.getElementById('qaHelp').addEventListener('click', () => {
-    showToast('Botga fayl yuboring → test avtomatik saqlanadi → bu yerda test boshlang');
+    showToast('🆘 "Yuklash" tugmasi orqali fayl tanlang, keyin testni boshlang.');
 });
 
 // ━━━ START ━━━
