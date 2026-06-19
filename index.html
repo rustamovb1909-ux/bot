@@ -809,7 +809,7 @@ function showPage(id) {
 // ━━━ TESTS LOAD ━━━
 async function loadTests() {
     try {
-        const resp = await fetch(`${API}/api/tests/${tgUserId}`);
+        const resp = await fetch(`${API}/api/tests?userId=${encodeURIComponent(tgUserId)}`);
         const data = await resp.json();
         state.tests = data.tests || [];
         document.getElementById('testsCount').textContent = state.tests.length;
@@ -919,7 +919,7 @@ fileInput.addEventListener('change', async (e) => {
 // ━━━ LOAD QUESTIONS ━━━
 async function loadTestQuestions(testId) {
     try {
-        const resp = await fetch(`${API}/api/test/${testId}`);
+        const resp = await fetch(`${API}/api/test/${testId}?userId=${encodeURIComponent(tgUserId)}`);
         const data = await resp.json();
         return data.questions || [];
     } catch (e) {
@@ -960,8 +960,13 @@ document.getElementById('startTestBtn').addEventListener('click', async () => {
         return;
     }
 
+    // Har bir savol uchun: to'g'ri javob indeksini variant matniga qarab qayta hisoblaymiz.
+    // Backend "correct" ni original (oldingi) indeks sifatida qaytaradi, lekin variantlar
+    // bo'sh ('') bo'lsa, ular chiqarib tashlangan. Shuning uchun haqiqiy indeksni
+    // correct_text orqali topamiz.
     const shuffledQuestions = shuffle(allQuestions).map(q => {
         const correctText = q.correct_text || q.options[q.correct];
+        // Bo'sh variantlarni chiqarib tashlaymiz
         const realOptions = q.options.filter(o => o && o.trim());
         const shuffledOpts = shuffle(realOptions);
         let newCorrect = shuffledOpts.indexOf(correctText);
@@ -1220,19 +1225,44 @@ document.getElementById('qaStart').addEventListener('click', () => {
 
 document.getElementById('qaResults').addEventListener('click', async () => {
     try {
-        const resp = await fetch(`${API}/api/results/${tgUserId}`);
+        const resp = await fetch(`${API}/api/results?userId=${encodeURIComponent(tgUserId)}`);
         const data = await resp.json();
         const results = data.results || [];
         if (results.length === 0) {
             showToast('Natijalar yoʻq');
             return;
         }
-        const text = results.slice(0, 5).map((r, i) => {
+        // Natijalarni sahifada ko'rsatamiz
+        const html = results.map(r => {
+            const date = (r.test_date || '').substring(0, 16).replace('T', ' ');
             const emoji = r.score >= 80 ? '🌟' : r.score >= 60 ? '👍' : r.score >= 40 ? '📚' : '💪';
-            return `${emoji} ${r.file_name}: ${r.score}%`;
-        }).join('\n');
-        showToast(text);
-    } catch (e) { console.error(e); }
+            return `
+                <div class="test-card" style="cursor:default;">
+                    <div class="t-icon">${emoji}</div>
+                    <div class="t-info">
+                        <div class="t-name">${escapeHtml(r.file_name || 'Test')}</div>
+                        <div class="t-meta">
+                            <i class="fas fa-calendar"></i>
+                            <span>${escapeHtml(date)}</span>
+                        </div>
+                        <div class="t-meta" style="margin-top:4px;">
+                            <span style="color:var(--green);">✓ ${r.correct_answers}</span>
+                            <span>·</span>
+                            <span style="color:var(--red);">✗ ${r.wrong_answers}</span>
+                            <span>·</span>
+                            <span style="color:var(--text-dim);">⊘ ${r.skipped_answers}</span>
+                        </div>
+                    </div>
+                    <div class="t-actions">
+                        <div class="t-badge" style="font-size:13px;">${r.score}%</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        document.getElementById('testsList').innerHTML = html;
+        document.getElementById('testsCount').textContent = results.length;
+        document.querySelector('.section-head .title').innerHTML = '<i class="fas fa-chart-line"></i> Natijalarim';
+    } catch (e) { console.error(e); showToast('Natijalarni yuklashda xatolik'); }
 });
 
 document.getElementById('qaHelp').addEventListener('click', () => {
