@@ -800,7 +800,29 @@ def api_upload():
                 html = result.value
             questions = parse_html_content(html)
 
-        # Tozalash
+        if not questions:
+            # Tozalash (savol topilmasa)
+            for p in [tmp_path, converted_path]:
+                if p and os.path.exists(p):
+                    try:
+                        os.unlink(p)
+                    except OSError:
+                        pass
+            if convert_dir and os.path.exists(convert_dir):
+                shutil.rmtree(convert_dir, ignore_errors=True)
+            return jsonify({'error': "Fayldan savollar topilmadi. Formatni tekshiring."}), 400
+
+        # Faylni doimiy saqlash
+        save_name = file_name[:-4] + '.docx' if ext == '.doc' else file_name
+        unique_name = f"{user_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{save_name}"
+        file_path = UPLOADS_DIR / unique_name
+
+        # Asl faylni (konvert qilingan yoki original) ko'chirish — tozalashdan OLDIN
+        src = converted_path if converted_path else tmp_path
+        if src and os.path.exists(src):
+            shutil.copy2(src, str(file_path))
+
+        # Endi tozalash
         for p in [tmp_path, converted_path]:
             if p and os.path.exists(p):
                 try:
@@ -809,19 +831,6 @@ def api_upload():
                     pass
         if convert_dir and os.path.exists(convert_dir):
             shutil.rmtree(convert_dir, ignore_errors=True)
-
-        if not questions:
-            return jsonify({'error': "Fayldan savollar topilmadi. Formatni tekshiring."}), 400
-
-        # Faylni doimiy saqlash
-        save_name = file_name[:-4] + '.docx' if ext == '.doc' else file_name
-        unique_name = f"{user_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{save_name}"
-        file_path = UPLOADS_DIR / unique_name
-
-        # Asl faylni (konvert qilingan yoki original) ko'chirish
-        src = converted_path if converted_path else tmp_path
-        if os.path.exists(src):
-            shutil.copy2(src, str(file_path))
 
         file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
 
