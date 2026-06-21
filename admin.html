@@ -1,529 +1,1600 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Admin Panel</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-:root{
-  --bg:#0a0b14;--bg2:#11131f;--card:#181b2e;--card2:#1f2238;
-  --border:rgba(255,255,255,0.07);--text:#f0f2f7;--dim:#8b94ad;--muted:#5a637d;
-  --accent:#7c5cfc;--accent2:#b8bfff;--glow:rgba(124,92,252,0.35);
-  --green:#22c55e;--green-bg:rgba(34,197,94,0.1);
-  --red:#ef4444;--red-bg:rgba(239,68,68,0.1);
-  --orange:#f59e0b;--blue:#3b82f6;
-}
-body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Admin Panel • Bot boshqaruvi</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <style>
+        :root {
+            --bg: #07080f;
+            --bg2: #0e101d;
+            --card: #141725;
+            --card2: #1a1e33;
+            --border: rgba(255, 255, 255, 0.06);
+            --text: #eef0f9;
+            --text2: #c5cae3;
+            --dim: #8a90b4;
+            --muted: #5c6388;
+            --accent: #7c5cfc;
+            --accent-glow: rgba(124, 92, 252, 0.4);
+            --accent2: #c4c0ff;
+            --green: #22c55e;
+            --green-bg: rgba(34, 197, 94, 0.1);
+            --green-glow: rgba(34, 197, 94, 0.25);
+            --red: #ef4444;
+            --red-bg: rgba(239, 68, 68, 0.1);
+            --red-glow: rgba(239, 68, 68, 0.25);
+            --orange: #f59e0b;
+            --orange-bg: rgba(245, 158, 11, 0.1);
+            --blue: #3b82f6;
+            --blue-bg: rgba(59, 130, 246, 0.1);
+            --radius-sm: 8px;
+            --radius: 12px;
+            --radius-lg: 18px;
+            --radius-xl: 22px;
+            --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-/* LOGIN */
-#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
-.login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px 32px;width:100%;max-width:380px;text-align:center;}
-.login-icon{width:64px;height:64px;background:linear-gradient(135deg,#7c5cfc,#5b3fd9);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;margin:0 auto 20px;box-shadow:0 8px 24px var(--glow);}
-.login-box h2{font-size:22px;font-weight:800;margin-bottom:6px;}
-.login-box p{font-size:13px;color:var(--dim);margin-bottom:24px;}
-.input-wrap{position:relative;margin-bottom:14px;}
-.input-wrap i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;}
-.input-wrap input{width:100%;background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:13px 14px 13px 40px;color:var(--text);font-size:14px;outline:none;transition:border-color 0.2s;}
-.input-wrap input:focus{border-color:var(--accent);}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 20px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;border:none;font-family:inherit;transition:all 0.2s;}
-.btn-primary{background:linear-gradient(135deg,#7c5cfc,#5b3fd9);color:#fff;box-shadow:0 6px 20px var(--glow);width:100%;}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 28px var(--glow);}
-.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid rgba(239,68,68,0.25);padding:7px 14px;font-size:12px;border-radius:8px;}
-.btn-danger:hover{background:var(--red);color:#fff;}
-.btn-ghost{background:transparent;color:var(--dim);border:1px solid var(--border);padding:7px 14px;font-size:12px;border-radius:8px;}
-.btn-ghost:hover{background:var(--card2);color:var(--text);}
-.err-msg{color:var(--red);font-size:12px;margin-top:10px;display:none;}
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-/* LAYOUT */
-#adminPage{display:none;}
-.sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;padding:20px 0;z-index:10;}
-.sidebar .logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;}
-.sidebar .logo-icon{width:38px;height:38px;background:linear-gradient(135deg,#7c5cfc,#5b3fd9);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;}
-.sidebar .logo span{font-size:16px;font-weight:800;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--dim);font-size:13.5px;font-weight:600;cursor:pointer;transition:all 0.2s;border-left:3px solid transparent;}
-.nav-item:hover{color:var(--text);background:rgba(124,92,252,0.06);}
-.nav-item.active{color:var(--accent2);background:rgba(124,92,252,0.1);border-left-color:var(--accent);}
-.nav-item i{width:18px;text-align:center;font-size:14px;}
-.sidebar-bottom{margin-top:auto;padding:0 20px;}
-.sidebar-user{font-size:12px;color:var(--muted);margin-bottom:12px;}
-.main{margin-left:220px;padding:28px;min-height:100vh;}
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
 
-/* TOP BAR */
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
-.topbar h1{font-size:22px;font-weight:800;}
-.topbar .sub{font-size:13px;color:var(--dim);margin-top:2px;}
-.search-wrap{position:relative;}
-.search-wrap i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;}
-.search-wrap input{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px 9px 36px;color:var(--text);font-size:13px;outline:none;width:220px;transition:border-color 0.2s;}
-.search-wrap input:focus{border-color:var(--accent);}
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
 
-/* STATS */
-.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:28px;}
-.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 16px;}
-.stat-card .s-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:12px;}
-.stat-card .s-val{font-size:26px;font-weight:800;letter-spacing:-1px;}
-.stat-card .s-label{font-size:11px;color:var(--dim);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px;}
-.purple-bg{background:rgba(124,92,252,0.12);color:#b8bfff;}
-.green-bg{background:rgba(34,197,94,0.12);color:var(--green);}
-.orange-bg{background:rgba(245,158,11,0.12);color:var(--orange);}
-.blue-bg{background:rgba(59,130,246,0.12);color:var(--blue);}
-.red-bg-soft{background:rgba(239,68,68,0.12);color:var(--red);}
+        /* ── LOGIN ── */
+        #loginPage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            background: radial-gradient(ellipse at center, #11131f 0%, #07080f 70%);
+        }
+        .login-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            animation: fadeUp 0.5s ease;
+        }
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .login-icon {
+            width: 68px;
+            height: 68px;
+            background: linear-gradient(135deg, #7c5cfc, #5a30e0);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: #fff;
+            margin: 0 auto 22px;
+            box-shadow: 0 10px 30px var(--accent-glow);
+        }
+        .login-box h2 {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+        .login-box .login-sub {
+            font-size: 13px;
+            color: var(--dim);
+            margin-bottom: 28px;
+            line-height: 1.5;
+        }
+        .input-wrap {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        .input-wrap i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            font-size: 15px;
+            transition: color var(--transition);
+            pointer-events: none;
+        }
+        .input-wrap input {
+            width: 100%;
+            background: var(--bg2);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 15px 14px 44px;
+            color: var(--text);
+            font-size: 14.5px;
+            outline: none;
+            transition: all var(--transition);
+            font-family: inherit;
+        }
+        .input-wrap input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.1);
+        }
+        .input-wrap input:focus+i,
+        .input-wrap:focus-within i {
+            color: var(--accent2);
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 13px 22px;
+            border-radius: var(--radius);
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+            transition: all var(--transition);
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            user-select: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #7c5cfc, #5a30e0);
+            color: #fff;
+            box-shadow: 0 6px 22px var(--accent-glow);
+            width: 100%;
+            font-size: 15px;
+            padding: 15px;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px var(--accent-glow);
+            filter: brightness(1.08);
+        }
+        .btn-primary:active {
+            transform: translateY(0);
+            filter: brightness(0.95);
+        }
+        .btn-danger {
+            background: var(--red-bg);
+            color: var(--red);
+            border: 1.5px solid rgba(239, 68, 68, 0.2);
+            padding: 9px 16px;
+            font-size: 12.5px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+        }
+        .btn-danger:hover {
+            background: var(--red);
+            color: #fff;
+            box-shadow: 0 4px 16px var(--red-glow);
+        }
+        .btn-ghost {
+            background: transparent;
+            color: var(--dim);
+            border: 1.5px solid var(--border);
+            padding: 9px 16px;
+            font-size: 12.5px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+        }
+        .btn-ghost:hover {
+            background: var(--card2);
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        .btn-sm {
+            padding: 7px 12px;
+            font-size: 11.5px;
+            border-radius: 6px;
+        }
+        .err-msg {
+            color: var(--red);
+            font-size: 12.5px;
+            margin-top: 12px;
+            display: none;
+            animation: shake 0.4s ease;
+        }
+        @keyframes shake {
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+            25% {
+                transform: translateX(-6px);
+            }
+            50% {
+                transform: translateX(6px);
+            }
+            75% {
+                transform: translateX(-3px);
+            }
+        }
 
-/* TABLE */
-.table-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
-.table-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
-.table-head .title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;}
-.table-head .title i{color:var(--accent);font-size:13px;}
-.table-head .badge{background:rgba(124,92,252,0.12);color:var(--accent2);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
-table{width:100%;border-collapse:collapse;}
-th{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:700;padding:12px 16px;text-align:left;background:var(--bg2);border-bottom:1px solid var(--border);}
-td{padding:13px 16px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle;}
-tr:last-child td{border-bottom:none;}
-tr:hover td{background:rgba(255,255,255,0.02);}
-.badge-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
-.badge-green{background:var(--green-bg);color:var(--green);}
-.badge-gray{background:rgba(255,255,255,0.06);color:var(--dim);}
-.badge-blue{background:rgba(59,130,246,0.12);color:var(--blue);}
-.phone{font-family:monospace;font-size:12.5px;color:var(--accent2);}
-.userid{font-family:monospace;font-size:11px;color:var(--muted);}
-.action-btns{display:flex;gap:6px;}
+        /* ── LAYOUT ── */
+        #adminPage {
+            display: none;
+        }
+        .sidebar {
+            width: 230px;
+            background: var(--bg2);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 18px 0;
+            z-index: 10;
+            transition: transform var(--transition);
+        }
+        .sidebar .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 18px 20px;
+        }
+        .sidebar .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #7c5cfc, #5a30e0);
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 17px;
+            box-shadow: 0 4px 14px var(--accent-glow);
+        }
+        .sidebar .logo span {
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 18px;
+            color: var(--dim);
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+            border-left: 3px solid transparent;
+            margin: 1px 0;
+            position: relative;
+        }
+        .nav-item:hover {
+            color: var(--text);
+            background: rgba(124, 92, 252, 0.05);
+        }
+        .nav-item.active {
+            color: var(--accent2);
+            background: rgba(124, 92, 252, 0.1);
+            border-left-color: var(--accent);
+        }
+        .nav-item i {
+            width: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .nav-dot {
+            position: absolute;
+            right: 14px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity var(--transition);
+        }
+        .nav-item.active .nav-dot {
+            opacity: 1;
+        }
+        .sidebar-bottom {
+            margin-top: auto;
+            padding: 0 18px;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+        }
+        .sidebar-user {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sidebar-user i {
+            color: var(--green);
+            font-size: 8px;
+        }
+        .main {
+            margin-left: 230px;
+            padding: 24px 28px;
+            min-height: 100vh;
+            transition: margin-left var(--transition);
+        }
 
-/* PAGINATION */
-.pagination{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-top:1px solid var(--border);}
-.pagination .info{font-size:12px;color:var(--dim);}
-.page-btns{display:flex;gap:6px;}
-.page-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--dim);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;font-family:inherit;font-weight:700;}
-.page-btn:hover:not(:disabled){border-color:var(--accent);color:var(--text);}
-.page-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
-.page-btn:disabled{opacity:0.3;cursor:not-allowed;}
+        /* ── TOP BAR ── */
+        .topbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+        .topbar h1 {
+            font-size: 23px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            line-height: 1.1;
+        }
+        .topbar .sub {
+            font-size: 12.5px;
+            color: var(--dim);
+            margin-top: 3px;
+        }
+        .search-wrap {
+            position: relative;
+        }
+        .search-wrap i {
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            font-size: 13px;
+            pointer-events: none;
+            transition: color var(--transition);
+        }
+        .search-wrap input {
+            background: var(--card);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px 14px 10px 38px;
+            color: var(--text);
+            font-size: 13px;
+            outline: none;
+            width: 240px;
+            transition: all var(--transition);
+            font-family: inherit;
+        }
+        .search-wrap input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.08);
+            width: 280px;
+        }
+        .search-wrap input:focus+i {
+            color: var(--accent2);
+        }
+        .search-clear {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 12px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            display: none;
+            transition: color var(--transition);
+        }
+        .search-clear:hover {
+            color: var(--text);
+        }
+        .search-clear.visible {
+            display: block;
+        }
 
-/* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
-.modal-overlay.open{display:flex;}
-.modal{background:var(--card);border:1px solid var(--border);border-radius:20px;width:100%;max-width:560px;max-height:85vh;overflow-y:auto;}
-.modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1;}
-.modal-head h3{font-size:17px;font-weight:800;}
-.modal-close{width:32px;height:32px;border-radius:8px;background:var(--card2);border:none;color:var(--dim);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
-.modal-close:hover{color:var(--text);}
-.modal-body{padding:20px 24px;}
-.info-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
-.info-row:last-child{border-bottom:none;}
-.info-row .lbl{font-size:12px;color:var(--dim);width:130px;flex-shrink:0;}
-.info-row .val{font-size:13px;font-weight:600;flex:1;}
-.section-title{font-size:13px;font-weight:700;color:var(--accent2);margin:16px 0 10px;text-transform:uppercase;letter-spacing:0.5px;}
-.mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;}
-.mini-card .mc-name{font-size:13px;font-weight:600;}
-.mini-card .mc-meta{font-size:11px;color:var(--dim);margin-top:3px;display:flex;gap:10px;}
+        /* ── STATS ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 20px 18px;
+            box-shadow: var(--shadow-card);
+            transition: all var(--transition);
+            cursor: default;
+        }
+        .stat-card:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        .stat-card .s-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            margin-bottom: 14px;
+            transition: transform var(--transition);
+        }
+        .stat-card:hover .s-icon {
+            transform: scale(1.08);
+        }
+        .stat-card .s-val {
+            font-size: 30px;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            line-height: 1;
+        }
+        .stat-card .s-label {
+            font-size: 11px;
+            color: var(--dim);
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            font-weight: 600;
+        }
+        .purple-bg {
+            background: rgba(124, 92, 252, 0.12);
+            color: #b8bfff;
+        }
+        .green-bg {
+            background: var(--green-bg);
+            color: var(--green);
+        }
+        .orange-bg {
+            background: var(--orange-bg);
+            color: var(--orange);
+        }
+        .blue-bg {
+            background: var(--blue-bg);
+            color: var(--blue);
+        }
+        .red-bg-soft {
+            background: var(--red-bg);
+            color: var(--red);
+        }
 
-/* LOADER */
-.loader{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.15);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
-.loading-state{text-align:center;padding:40px;color:var(--dim);}
+        /* ── TABLE ── */
+        .table-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-card);
+        }
+        .table-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .table-head .title {
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: -0.2px;
+        }
+        .table-head .title i {
+            color: var(--accent);
+            font-size: 13px;
+        }
+        .badge {
+            background: rgba(124, 92, 252, 0.1);
+            color: var(--accent2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: var(--muted);
+            font-weight: 700;
+            padding: 12px 14px;
+            text-align: left;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        td {
+            padding: 13px 14px;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            vertical-align: middle;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tbody tr {
+            transition: background var(--transition);
+        }
+        tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.015);
+        }
+        .badge-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+        .badge-green {
+            background: var(--green-bg);
+            color: var(--green);
+        }
+        .badge-gray {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--dim);
+        }
+        .badge-blue {
+            background: var(--blue-bg);
+            color: var(--blue);
+        }
+        .badge-accent {
+            background: rgba(124, 92, 252, 0.1);
+            color: var(--accent2);
+        }
+        .phone {
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 13px;
+            color: #fff;
+            background: rgba(124, 92, 252, 0.08);
+            padding: 4px 10px;
+            border-radius: 6px;
+            letter-spacing: 0.3px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .phone-none {
+            font-size: 11.5px;
+            color: var(--muted);
+            font-style: italic;
+        }
+        .userid {
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 12.5px;
+            color: #e0ddfa;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 3px 8px;
+            border-radius: 5px;
+            letter-spacing: 0.2px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition);
+            white-space: nowrap;
+        }
+        .userid:hover {
+            background: rgba(124, 92, 252, 0.15);
+            color: #fff;
+        }
+        .user-name {
+            font-weight: 600;
+            color: #fff;
+            font-size: 13.5px;
+        }
+        .user-username {
+            color: var(--dim);
+            font-size: 12px;
+        }
+        .action-btns {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
 
-/* TOAST */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--card2);border:1px solid var(--border);padding:12px 18px;border-radius:12px;font-size:13px;opacity:0;transform:translateY(10px);transition:all 0.3s;z-index:200;pointer-events:none;}
-.toast.show{opacity:1;transform:translateY(0);}
+        /* ── PAGINATION ── */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-top: 1px solid var(--border);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .pagination .info {
+            font-size: 12px;
+            color: var(--dim);
+            font-weight: 500;
+        }
+        .page-btns {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .page-btn {
+            min-width: 34px;
+            height: 34px;
+            border-radius: var(--radius-sm);
+            border: 1.5px solid var(--border);
+            background: transparent;
+            color: var(--dim);
+            cursor: pointer;
+            font-size: 12.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+            font-family: inherit;
+            font-weight: 700;
+            padding: 0 8px;
+        }
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--accent);
+            color: var(--text);
+            background: rgba(124, 92, 252, 0.05);
+        }
+        .page-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            box-shadow: 0 2px 10px var(--accent-glow);
+        }
+        .page-btn:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
 
-/* PAGES */
-.tab-page{display:none;}
-.tab-page.active{display:block;}
+        /* ── MODAL ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.open {
+            display: flex;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            width: 100%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .modal-head {
+            padding: 18px 22px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            background: var(--card);
+            z-index: 1;
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        }
+        .modal-head h3 {
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+        .modal-close {
+            width: 34px;
+            height: 34px;
+            border-radius: var(--radius-sm);
+            background: var(--card2);
+            border: 1px solid var(--border);
+            color: var(--dim);
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+        }
+        .modal-close:hover {
+            color: var(--text);
+            background: var(--red-bg);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        .modal-body {
+            padding: 20px 22px;
+        }
+        .info-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-row .lbl {
+            font-size: 11.5px;
+            color: var(--dim);
+            width: 130px;
+            flex-shrink: 0;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding-top: 1px;
+        }
+        .info-row .val {
+            font-size: 13.5px;
+            font-weight: 600;
+            flex: 1;
+            word-break: break-word;
+        }
+        .section-title {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--accent2);
+            margin: 18px 0 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .mini-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 11px 15px;
+            margin-bottom: 7px;
+            transition: all var(--transition);
+        }
+        .mini-card:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        .mini-card .mc-name {
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mini-card .mc-meta {
+            font-size: 11px;
+            color: var(--dim);
+            margin-top: 4px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .mini-card .mc-meta span {
+            white-space: nowrap;
+        }
 
-@media(max-width:900px){
-  .stats-grid{grid-template-columns:repeat(2,1fr);}
-  .sidebar{width:60px;}
-  .sidebar .logo span,.nav-item span,.sidebar-user,.sidebar-bottom .btn{display:none;}
-  .nav-item{justify-content:center;padding:12px;}
-  .main{margin-left:60px;}
-}
-</style>
+        /* ── TOAST ── */
+        .toast {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            background: var(--card2);
+            border: 1px solid var(--border);
+            padding: 13px 20px;
+            border-radius: var(--radius);
+            font-size: 13.5px;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 200;
+            pointer-events: none;
+            box-shadow: var(--shadow-lg);
+            max-width: 400px;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ── LOADER ── */
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2.5px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .loading-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--dim);
+        }
+        .loading-state .loader {
+            margin-bottom: 10px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--muted);
+        }
+        .empty-state i {
+            font-size: 36px;
+            margin-bottom: 10px;
+            display: block;
+            opacity: 0.5;
+        }
+
+        /* ── TABS ── */
+        .tab-page {
+            display: none;
+        }
+        .tab-page.active {
+            display: block;
+            animation: fadeUp 0.3s ease;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 1100px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        @media (max-width: 900px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .sidebar {
+                width: 62px;
+                padding: 14px 0;
+            }
+            .sidebar .logo {
+                justify-content: center;
+                padding: 0 8px 16px;
+            }
+            .sidebar .logo span,
+            .nav-item span,
+            .sidebar-user,
+            .sidebar-bottom .btn span,
+            .nav-dot {
+                display: none;
+            }
+            .nav-item {
+                justify-content: center;
+                padding: 12px;
+                border-left: none;
+                border-radius: 0;
+            }
+            .nav-item.active {
+                border-left: none;
+                border-right: 3px solid var(--accent);
+            }
+            .sidebar-bottom .btn {
+                justify-content: center;
+                width: 100%;
+                padding: 10px;
+            }
+            .main {
+                margin-left: 62px;
+                padding: 18px 16px;
+            }
+            .search-wrap input {
+                width: 180px;
+            }
+            .search-wrap input:focus {
+                width: 200px;
+            }
+            .topbar h1 {
+                font-size: 20px;
+            }
+        }
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            .stat-card {
+                padding: 14px 12px;
+            }
+            .stat-card .s-val {
+                font-size: 24px;
+            }
+            .stat-card .s-icon {
+                width: 34px;
+                height: 34px;
+                font-size: 14px;
+                margin-bottom: 8px;
+            }
+            .main {
+                margin-left: 0;
+                padding: 12px;
+                padding-bottom: 70px;
+            }
+            .sidebar {
+                bottom: auto;
+                top: auto;
+                width: 100%;
+                height: 56px;
+                flex-direction: row;
+                align-items: center;
+                padding: 0 8px;
+                border-right: none;
+                border-top: 1px solid var(--border);
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 50;
+                justify-content: space-around;
+            }
+            .sidebar .logo,
+            .sidebar-bottom,
+            .sidebar .logo span,
+            .sidebar-user {
+                display: none;
+            }
+            .nav-item {
+                border-left: none !important;
+                border-right: none !important;
+                border-top: 2px solid transparent;
+                padding: 8px 12px;
+                font-size: 10px;
+                flex-direction: column;
+                gap: 4px;
+                border-radius: 0;
+                margin: 0;
+                flex: 1;
+                justify-content: center;
+                text-align: center;
+            }
+            .nav-item.active {
+                border-top-color: var(--accent);
+                border-right: none;
+                background: rgba(124, 92, 252, 0.08);
+            }
+            .nav-item i {
+                font-size: 16px;
+                width: auto;
+            }
+            .nav-item span {
+                display: block !important;
+                font-size: 9px;
+            }
+            .topbar {
+                flex-direction: column;
+            }
+            .search-wrap {
+                width: 100%;
+            }
+            .search-wrap input {
+                width: 100%;
+            }
+            .search-wrap input:focus {
+                width: 100%;
+            }
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+            .modal {
+                max-width: 95vw;
+                max-height: 80vh;
+                border-radius: var(--radius-lg);
+            }
+            .info-row {
+                flex-direction: column;
+                gap: 2px;
+            }
+            .info-row .lbl {
+                width: auto;
+            }
+            .toast {
+                bottom: 70px;
+                right: 12px;
+                left: 12px;
+                max-width: none;
+            }
+        }
+    </style>
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="loginPage">
-  <div class="login-box">
-    <div class="login-icon"><i class="fas fa-shield-alt"></i></div>
-    <h2>Admin Panel</h2>
-    <p>Kirish uchun parolni kiriting</p>
-    <div class="input-wrap">
-      <i class="fas fa-lock"></i>
-      <input type="password" id="passwordInput" placeholder="Parol" onkeydown="if(event.key==='Enter')doLogin()"/>
-    </div>
-    <button class="btn btn-primary" onclick="doLogin()"><i class="fas fa-sign-in-alt"></i> Kirish</button>
-    <div class="err-msg" id="loginErr">Parol noto'g'ri!</div>
-  </div>
-</div>
-
-<!-- ADMIN -->
-<div id="adminPage">
-  <div class="sidebar">
-    <div class="logo">
-      <div class="logo-icon"><i class="fas fa-shield-alt"></i></div>
-      <span>Admin</span>
-    </div>
-    <div class="nav-item active" onclick="showTab('dashboard')" id="nav-dashboard">
-      <i class="fas fa-chart-pie"></i><span>Dashboard</span>
-    </div>
-    <div class="nav-item" onclick="showTab('users')" id="nav-users">
-      <i class="fas fa-users"></i><span>Foydalanuvchilar</span>
-    </div>
-    <div class="sidebar-bottom">
-      <div class="sidebar-user">Admin sifatida kirgansiz</div>
-      <button class="btn btn-ghost" onclick="logout()" style="width:100%;"><i class="fas fa-sign-out-alt"></i> <span>Chiqish</span></button>
-    </div>
-  </div>
-
-  <div class="main">
-
-    <!-- DASHBOARD -->
-    <div class="tab-page active" id="tab-dashboard">
-      <div class="topbar">
-        <div>
-          <h1>Dashboard</h1>
-          <div class="sub">Umumiy statistika</div>
+    <!-- ─── LOGIN ─── -->
+    <div id="loginPage">
+        <div class="login-box">
+            <div class="login-icon"><i class="fas fa-shield-haltered"></i></div>
+            <h2>Admin Panel</h2>
+            <p class="login-sub">Bot boshqaruv paneliga kirish uchun<br>maxfiy parolni kiriting</p>
+            <div class="input-wrap">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="passwordInput" placeholder="Parolni kiriting..." onkeydown="if(event.key==='Enter')doLogin()" autocomplete="off" />
+            </div>
+            <button class="btn btn-primary" onclick="doLogin()"><i class="fas fa-arrow-right-to-bracket"></i> Tizimga kirish</button>
+            <div class="err-msg" id="loginErr">❌ Parol noto'g'ri! Qaytadan urinib ko'ring.</div>
         </div>
-        <button class="btn btn-ghost" onclick="loadStats()" style="padding:9px 16px;font-size:13px;">
-          <i class="fas fa-sync-alt"></i> Yangilash
-        </button>
-      </div>
-
-      <div class="stats-grid" id="statsGrid">
-        <div class="stat-card"><div class="s-icon purple-bg"><i class="fas fa-users"></i></div><div class="s-val">—</div><div class="s-label">Jami foydalanuvchi</div></div>
-        <div class="stat-card"><div class="s-icon green-bg"><i class="fas fa-phone"></i></div><div class="s-val">—</div><div class="s-label">Telefon ulashgan</div></div>
-        <div class="stat-card"><div class="s-icon blue-bg"><i class="fas fa-file-alt"></i></div><div class="s-val">—</div><div class="s-label">Yuklangan fayllar</div></div>
-        <div class="stat-card"><div class="s-icon orange-bg"><i class="fas fa-question-circle"></i></div><div class="s-val">—</div><div class="s-label">Jami savollar</div></div>
-        <div class="stat-card"><div class="s-icon red-bg-soft"><i class="fas fa-poll"></i></div><div class="s-val">—</div><div class="s-label">Topshirilgan testlar</div></div>
-      </div>
-
-      <div class="table-card">
-        <div class="table-head">
-          <div class="title"><i class="fas fa-users"></i> Oxirgi foydalanuvchilar</div>
-          <div class="badge" id="dashUserCount">0</div>
-        </div>
-        <div id="dashUserTable"><div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div></div>
-      </div>
     </div>
 
-    <!-- USERS -->
-    <div class="tab-page" id="tab-users">
-      <div class="topbar">
-        <div>
-          <h1>Foydalanuvchilar</h1>
-          <div class="sub" id="userCountSub">Yuklanmoqda...</div>
+    <!-- ─── ADMIN PANEL ─── -->
+    <div id="adminPage">
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-icon"><i class="fas fa-shield-haltered"></i></div>
+                <span>Admin</span>
+            </div>
+            <div class="nav-item active" onclick="showTab('dashboard')" id="nav-dashboard">
+                <i class="fas fa-chart-pie"></i><span>Dashboard</span>
+                <div class="nav-dot"></div>
+            </div>
+            <div class="nav-item" onclick="showTab('users')" id="nav-users">
+                <i class="fas fa-users"></i><span>Foydalanuvchilar</span>
+                <div class="nav-dot"></div>
+            </div>
+            <div class="sidebar-bottom">
+                <div class="sidebar-user"><i class="fas fa-circle"></i> Admin rejimida</div>
+                <button class="btn btn-ghost" onclick="logout()" style="width:100%;">
+                    <i class="fas fa-sign-out-alt"></i> <span>Chiqish</span>
+                </button>
+            </div>
         </div>
-        <div class="search-wrap">
-          <i class="fas fa-search"></i>
-          <input type="text" id="searchInput" placeholder="Ism, telefon, ID..." oninput="debounceSearch()"/>
-        </div>
-      </div>
 
-      <div class="table-card">
-        <div class="table-head">
-          <div class="title"><i class="fas fa-list"></i> Barcha foydalanuvchilar</div>
-          <div class="badge" id="totalBadge">0</div>
+        <div class="main">
+            <!-- DASHBOARD -->
+            <div class="tab-page active" id="tab-dashboard">
+                <div class="topbar">
+                    <div>
+                        <h1>📊 Dashboard</h1>
+                        <div class="sub">Bot bo'yicha umumiy statistika</div>
+                    </div>
+                    <button class="btn btn-ghost" onclick="loadStats()" style="padding:9px 16px;font-size:13px;">
+                        <i class="fas fa-arrows-rotate"></i> Yangilash
+                    </button>
+                </div>
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-card"><div class="s-icon purple-bg"><i class="fas fa-users"></i></div><div class="s-val">—</div><div class="s-label">Jami foydalanuvchi</div></div>
+                    <div class="stat-card"><div class="s-icon green-bg"><i class="fas fa-phone"></i></div><div class="s-val">—</div><div class="s-label">Telefon ulashgan</div></div>
+                    <div class="stat-card"><div class="s-icon blue-bg"><i class="fas fa-file-alt"></i></div><div class="s-val">—</div><div class="s-label">Yuklangan fayllar</div></div>
+                    <div class="stat-card"><div class="s-icon orange-bg"><i class="fas fa-circle-question"></i></div><div class="s-val">—</div><div class="s-label">Jami savollar</div></div>
+                    <div class="stat-card"><div class="s-icon red-bg-soft"><i class="fas fa-square-poll-vertical"></i></div><div class="s-val">—</div><div class="s-label">Topshirilgan testlar</div></div>
+                </div>
+                <div class="table-card">
+                    <div class="table-head">
+                        <div class="title"><i class="fas fa-clock"></i> Oxirgi ro'yxatdan o'tganlar</div>
+                        <div class="badge" id="dashUserCount">0</div>
+                    </div>
+                    <div id="dashUserTable"><div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div></div>
+                </div>
+            </div>
+
+            <!-- USERS -->
+            <div class="tab-page" id="tab-users">
+                <div class="topbar">
+                    <div>
+                        <h1>👥 Foydalanuvchilar</h1>
+                        <div class="sub" id="userCountSub">Yuklanmoqda...</div>
+                    </div>
+                    <div class="search-wrap">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchInput" placeholder="Ism, telefon, ID, username..." oninput="debounceSearch()" />
+                        <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Tozalash"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="table-card">
+                    <div class="table-head">
+                        <div class="title"><i class="fas fa-list-ul"></i> Barcha foydalanuvchilar</div>
+                        <div class="badge" id="totalBadge">0</div>
+                    </div>
+                    <div id="usersTableWrap">
+                        <div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div>
+                    </div>
+                    <div class="pagination" id="paginationWrap" style="display:none;">
+                        <div class="info" id="pageInfo"></div>
+                        <div class="page-btns" id="pageBtns"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="usersTableWrap">
-          <div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div>
-        </div>
-        <div class="pagination" id="paginationWrap" style="display:none;">
-          <div class="info" id="pageInfo"></div>
-          <div class="page-btns" id="pageBtns"></div>
-        </div>
-      </div>
     </div>
 
-  </div>
-</div>
-
-<!-- USER DETAIL MODAL -->
-<div class="modal-overlay" id="userModal">
-  <div class="modal">
-    <div class="modal-head">
-      <h3 id="modalTitle">Foydalanuvchi</h3>
-      <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="modal-body" id="modalBody">
-      <div class="loading-state"><div class="loader"></div></div>
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script>
-const API = window.location.origin;
-let adminToken = sessionStorage.getItem('adminToken') || '';
-let currentPage = 1;
-let totalUsers = 0;
-let searchTimer = null;
-let currentDeleteId = null;
-
-// ─── LOGIN ───
-async function doLogin() {
-  const pw = document.getElementById('passwordInput').value;
-  if (!pw) return;
-  try {
-    const r = await fetch(`${API}/api/admin/login`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({password: pw})
-    });
-    const d = await r.json();
-    if (d.ok) {
-      adminToken = d.token;
-      sessionStorage.setItem('adminToken', adminToken);
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('adminPage').style.display = 'block';
-      loadStats();
-      loadUsers();
-    } else {
-      const e = document.getElementById('loginErr');
-      e.style.display = 'block';
-      setTimeout(() => e.style.display = 'none', 2500);
-    }
-  } catch(err) { showToast('❌ Server xatosi'); }
-}
-
-function logout() {
-  sessionStorage.removeItem('adminToken');
-  adminToken = '';
-  document.getElementById('loginPage').style.display = 'flex';
-  document.getElementById('adminPage').style.display = 'none';
-  document.getElementById('passwordInput').value = '';
-}
-
-// Auto-login if token exists
-if (adminToken) {
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('adminPage').style.display = 'block';
-  loadStats();
-  loadUsers();
-}
-
-// ─── TABS ───
-function showTab(name) {
-  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  document.getElementById('nav-' + name).classList.add('active');
-}
-
-// ─── STATS ───
-async function loadStats() {
-  try {
-    const r = await fetch(`${API}/api/admin/stats?token=${adminToken}`);
-    if (r.status === 403) { logout(); return; }
-    const d = await r.json();
-    const grid = document.getElementById('statsGrid');
-    const icons = ['purple-bg fa-users','green-bg fa-phone','blue-bg fa-file-alt','orange-bg fa-question-circle','red-bg-soft fa-poll'];
-    const labels = ['Jami foydalanuvchi','Telefon ulashgan','Yuklangan fayllar','Jami savollar','Topshirilgan testlar'];
-    const vals = [d.total_users, d.users_with_phone, d.total_files, d.total_questions, d.total_results];
-    grid.innerHTML = icons.map((ic,i) => {
-      const [cls, ico] = ic.split(' ');
-      return `<div class="stat-card">
-        <div class="s-icon ${cls}"><i class="fas ${ico}"></i></div>
-        <div class="s-val">${vals[i]}</div>
-        <div class="s-label">${labels[i]}</div>
-      </div>`;
-    }).join('');
-
-    // Dashboard jadval
-    loadDashUsers();
-  } catch(e) { showToast('❌ Stats yuklanmadi'); }
-}
-
-async function loadDashUsers() {
-  try {
-    const r = await fetch(`${API}/api/admin/users?token=${adminToken}&per_page=5`);
-    const d = await r.json();
-    document.getElementById('dashUserCount').textContent = d.total;
-    document.getElementById('dashUserTable').innerHTML = buildTable(d.users, false);
-  } catch(e) {}
-}
-
-// ─── USERS ───
-async function loadUsers(page = 1) {
-  currentPage = page;
-  const search = document.getElementById('searchInput').value.trim();
-  document.getElementById('usersTableWrap').innerHTML = '<div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div>';
-  document.getElementById('paginationWrap').style.display = 'none';
-
-  try {
-    const r = await fetch(`${API}/api/admin/users?token=${adminToken}&page=${page}&per_page=20&search=${encodeURIComponent(search)}`);
-    if (r.status === 403) { logout(); return; }
-    const d = await r.json();
-    totalUsers = d.total;
-
-    document.getElementById('totalBadge').textContent = d.total;
-    document.getElementById('userCountSub').textContent = `Jami ${d.total} ta foydalanuvchi`;
-
-    if (d.users.length === 0) {
-      document.getElementById('usersTableWrap').innerHTML = '<div class="loading-state" style="color:var(--muted)"><i class="fas fa-inbox" style="font-size:32px;margin-bottom:10px;"></i><br>Foydalanuvchi topilmadi</div>';
-      return;
-    }
-
-    document.getElementById('usersTableWrap').innerHTML = buildTable(d.users, true);
-    renderPagination(d.total, page, d.per_page);
-  } catch(e) { showToast('❌ Yuklanmadi'); }
-}
-
-function buildTable(users, showActions) {
-  const rows = users.map(u => {
-    const phone = u.phone_number ? `<span class="phone">${u.phone_number}</span>` : '<span class="badge-pill badge-gray">Yo\'q</span>';
-    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
-    const username = u.username ? `@${u.username}` : '—';
-    const date = (u.registered_at || '').substring(0, 10);
-    const score = u.avg_score ? Math.round(u.avg_score) + '%' : '—';
-    const actions = showActions ? `
-      <div class="action-btns">
-        <button class="btn btn-ghost" onclick="openUser(${u.user_id})" title="Ko'rish"><i class="fas fa-eye"></i></button>
-        <button class="btn btn-danger" onclick="confirmDelete(${u.user_id}, '${esc(name)}')" title="O'chirish"><i class="fas fa-trash"></i></button>
-      </div>` : `<button class="btn btn-ghost" onclick="openUser(${u.user_id})"><i class="fas fa-eye"></i></button>`;
-    return `<tr>
-      <td><div style="font-weight:600">${esc(name)}</div><div class="userid">${u.user_id}</div></td>
-      <td style="color:var(--dim)">${esc(username)}</td>
-      <td>${phone}</td>
-      <td><span class="badge-pill badge-blue">${u.files_count}</span></td>
-      <td><span class="badge-pill badge-green">${u.results_count}</span></td>
-      <td style="color:var(--dim)">${score}</td>
-      <td style="color:var(--muted);font-size:12px">${date}</td>
-      <td>${actions}</td>
-    </tr>`;
-  }).join('');
-
-  return `<table>
-    <thead><tr>
-      <th>Ism</th><th>Username</th><th>Telefon</th>
-      <th>Fayllar</th><th>Testlar</th><th>O'rtacha</th><th>Sana</th><th></th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
-}
-
-function renderPagination(total, page, perPage) {
-  const pages = Math.ceil(total / perPage);
-  if (pages <= 1) return;
-  document.getElementById('paginationWrap').style.display = 'flex';
-  document.getElementById('pageInfo').textContent = `${(page-1)*perPage+1}–${Math.min(page*perPage, total)} / ${total}`;
-
-  let btns = `<button class="page-btn" onclick="loadUsers(${page-1})" ${page===1?'disabled':''}><i class="fas fa-chevron-left"></i></button>`;
-  const start = Math.max(1, page-2), end = Math.min(pages, page+2);
-  for (let i = start; i <= end; i++) {
-    btns += `<button class="page-btn ${i===page?'active':''}" onclick="loadUsers(${i})">${i}</button>`;
-  }
-  btns += `<button class="page-btn" onclick="loadUsers(${page+1})" ${page===pages?'disabled':''}><i class="fas fa-chevron-right"></i></button>`;
-  document.getElementById('pageBtns').innerHTML = btns;
-}
-
-function debounceSearch() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => loadUsers(1), 400);
-}
-
-// ─── USER DETAIL ───
-async function openUser(userId) {
-  document.getElementById('modalTitle').textContent = 'Foydalanuvchi ma\'lumotlari';
-  document.getElementById('modalBody').innerHTML = '<div class="loading-state"><div class="loader"></div></div>';
-  document.getElementById('userModal').classList.add('open');
-
-  try {
-    const r = await fetch(`${API}/api/admin/user/${userId}?token=${adminToken}`);
-    const d = await r.json();
-    if (!d.user) { document.getElementById('modalBody').innerHTML = '<div class="loading-state">Topilmadi</div>'; return; }
-
-    const u = d.user;
-    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
-
-    const filesHtml = d.files.length ? d.files.map(f => `
-      <div class="mini-card">
-        <div class="mc-name"><i class="fas fa-file-alt" style="color:var(--accent);margin-right:6px;"></i>${esc(f.original_name || f.file_name || '—')}</div>
-        <div class="mc-meta">
-          <span><i class="fas fa-list"></i> ${f.questions_count} savol</span>
-          <span><i class="fas fa-calendar"></i> ${(f.uploaded_at||'').substring(0,10)}</span>
+    <!-- ─── USER DETAIL MODAL ─── -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <div class="modal-head">
+                <h3 id="modalTitle">👤 Foydalanuvchi</h3>
+                <button class="modal-close" onclick="closeModal()" title="Yopish (Esc)"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Ma'lumot yuklanmoqda...</div></div>
+            </div>
         </div>
-      </div>`).join('') : '<div style="color:var(--muted);font-size:13px;">Fayl yuklamagan</div>';
+    </div>
 
-    const resultsHtml = d.results.length ? d.results.map(r => {
-      const emoji = r.score>=80?'🌟':r.score>=60?'👍':r.score>=40?'📚':'💪';
-      return `<div class="mini-card">
-        <div class="mc-name">${emoji} ${esc(r.file_name||'Test')}</div>
-        <div class="mc-meta">
-          <span style="color:var(--green)">✓ ${r.correct_answers}</span>
-          <span style="color:var(--red)">✗ ${r.wrong_answers}</span>
-          <span style="color:var(--dim)">⊘ ${r.skipped_answers}</span>
-          <span style="color:var(--accent2);font-weight:700">${r.score}%</span>
-          <span>${(r.test_date||'').substring(0,16).replace('T',' ')}</span>
-        </div>
-      </div>`;
-    }).join('') : '<div style="color:var(--muted);font-size:13px;">Hali test topshirmagan</div>';
+    <!-- ─── TOAST ─── -->
+    <div class="toast" id="toast"></div>
 
-    document.getElementById('modalTitle').textContent = name;
-    document.getElementById('modalBody').innerHTML = `
-      <div class="info-row"><div class="lbl">Telegram ID</div><div class="val" style="font-family:monospace">${u.user_id}</div></div>
-      <div class="info-row"><div class="lbl">Ism</div><div class="val">${esc(name)}</div></div>
-      <div class="info-row"><div class="lbl">Username</div><div class="val" style="color:var(--accent2)">${u.username ? '@'+esc(u.username) : '—'}</div></div>
-      <div class="info-row"><div class="lbl">Telefon raqam</div><div class="val"><span class="phone">${u.phone_number || '—'}</span></div></div>
-      <div class="info-row"><div class="lbl">Ro'yxatdan o'tgan</div><div class="val" style="color:var(--dim)">${(u.registered_at||'').substring(0,16).replace('T',' ')}</div></div>
+    <script>
+        const API = window.location.origin;
+        let adminToken = sessionStorage.getItem('adminToken') || '';
+        let currentPage = 1;
+        let totalUsers = 0;
+        let searchTimer = null;
 
-      <div class="section-title"><i class="fas fa-file-alt"></i> Yuklangan fayllar (${d.files.length})</div>
-      ${filesHtml}
+        // ─── LOGIN ───
+        async function doLogin() {
+            const pw = document.getElementById('passwordInput').value;
+            if (!pw) {
+                document.getElementById('passwordInput').focus();
+                return;
+            }
+            const btn = document.querySelector('#loginPage .btn-primary');
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<div class="loader"></div> Tekshirilmoqda...';
+            btn.disabled = true;
+            try {
+                const r = await fetch(`${API}/api/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pw })
+                });
+                const d = await r.json();
+                if (d.ok) {
+                    adminToken = d.token;
+                    sessionStorage.setItem('adminToken', adminToken);
+                    document.getElementById('loginPage').style.display = 'none';
+                    document.getElementById('adminPage').style.display = 'block';
+                    loadStats();
+                    loadUsers();
+                    showToast('✅ Xush kelibsiz, admin!');
+                } else {
+                    const e = document.getElementById('loginErr');
+                    e.style.display = 'block';
+                    e.style.animation = 'none';
+                    e.offsetHeight;
+                    e.style.animation = 'shake 0.4s ease';
+                    document.getElementById('passwordInput').value = '';
+                    document.getElementById('passwordInput').focus();
+                    setTimeout(() => e.style.display = 'none', 3000);
+                }
+            } catch (err) {
+                showToast('❌ Server bilan bog\'lanib bo\'lmadi');
+            } finally {
+                btn.innerHTML = origHTML;
+                btn.disabled = false;
+            }
+        }
 
-      <div class="section-title"><i class="fas fa-poll"></i> Test natijalari (${d.results.length})</div>
-      ${resultsHtml}
+        function logout() {
+            sessionStorage.removeItem('adminToken');
+            adminToken = '';
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('adminPage').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('passwordInput').focus();
+            showToast('👋 Tizimdan chiqdingiz');
+        }
 
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
-        <button class="btn btn-danger" style="width:100%;" onclick="confirmDelete(${u.user_id}, '${esc(name)}'); closeModal();">
-          <i class="fas fa-trash"></i> Foydalanuvchini o'chirish
-        </button>
-      </div>
-    `;
-  } catch(e) { document.getElementById('modalBody').innerHTML = '<div class="loading-state">Xatolik yuz berdi</div>'; }
-}
+        // Auto-login
+        if (adminToken) {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('adminPage').style.display = 'block';
+            loadStats();
+            loadUsers();
+        } else {
+            document.getElementById('passwordInput').focus();
+        }
 
-function closeModal() {
-  document.getElementById('userModal').classList.remove('open');
-}
-document.getElementById('userModal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
+        // ─── TABS ───
+        function showTab(name) {
+            document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const tabEl = document.getElementById('tab-' + name);
+            const navEl = document.getElementById('nav-' + name);
+            if (tabEl) tabEl.classList.add('active');
+            if (navEl) navEl.classList.add('active');
+            if (name === 'users') {
+                document.getElementById('searchInput')?.focus();
+            }
+        }
 
-// ─── DELETE USER ───
-function confirmDelete(userId, name) {
-  if (!confirm(`"${name}" foydalanuvchisini o'chirishni tasdiqlaysizmi?\n\nBarcha fayllari va natijalari ham o'chiriladi!`)) return;
-  deleteUser(userId);
-}
+        // ─── STATS ───
+        async function loadStats() {
+            try {
+                const r = await fetch(`${API}/api/admin/stats?token=${encodeURIComponent(adminToken)}`);
+                if (r.status === 403) { logout(); return; }
+                const d = await r.json();
+                const grid = document.getElementById('statsGrid');
+                const items = [
+                    { cls: 'purple-bg', ico: 'fa-users', val: d.total_users, label: 'Jami foydalanuvchi' },
+                    { cls: 'green-bg', ico: 'fa-phone', val: d.users_with_phone, label: 'Telefon ulashgan' },
+                    { cls: 'blue-bg', ico: 'fa-file-alt', val: d.total_files, label: 'Yuklangan fayllar' },
+                    { cls: 'orange-bg', ico: 'fa-circle-question', val: d.total_questions, label: 'Jami savollar' },
+                    { cls: 'red-bg-soft', ico: 'fa-square-poll-vertical', val: d.total_results, label: 'Topshirilgan testlar' }
+                ];
+                grid.innerHTML = items.map(item => `
+                    <div class="stat-card">
+                        <div class="s-icon ${item.cls}"><i class="fas ${item.ico}"></i></div>
+                        <div class="s-val">${formatNum(item.val)}</div>
+                        <div class="s-label">${item.label}</div>
+                    </div>
+                `).join('');
+                loadDashUsers();
+            } catch (e) {
+                showToast('❌ Statistikani yuklab bo\'lmadi');
+            }
+        }
 
-async function deleteUser(userId) {
-  try {
-    const r = await fetch(`${API}/api/admin/delete_user/${userId}?token=${adminToken}`, {method:'DELETE'});
-    const d = await r.json();
-    if (d.ok) {
-      showToast('✅ Foydalanuvchi o\'chirildi');
-      loadUsers(currentPage);
-      loadStats();
-    } else {
-      showToast('❌ ' + (d.error || 'Xatolik'));
-    }
-  } catch(e) { showToast('❌ Server xatosi'); }
-}
+        async function loadDashUsers() {
+            try {
+                const r = await fetch(
+                `${API}/api/admin/users?token=${encodeURIComponent(adminToken)}&per_page=5`);
+                const d = await r.json();
+                document.getElementById('dashUserCount').textContent = d.total || 0;
+                document.getElementById('dashUserTable').innerHTML = buildTable(d.users || [], false);
+            } catch (e) {
+                document.getElementById('dashUserTable').innerHTML =
+                    '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>Yuklab bo\'lmadi</div>';
+            }
+        }
 
-// ─── UTILS ───
-function esc(s) {
-  if (!s) return '';
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+        // ─── USERS ───
+        async function loadUsers(page = 1) {
+            currentPage = page;
+            const search = document.getElementById('searchInput')?.value.trim() || '';
+            const wrap = document.getElementById('usersTableWrap');
+            const pagWrap = document.getElementById('paginationWrap');
+            wrap.innerHTML =
+                '<div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div>';
+            if (pagWrap) pagWrap.style.display = 'none';
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(t._t);
-  t._t = setTimeout(() => t.classList.remove('show'), 2800);
-}
+            // Show/hide clear button
+            const clearBtn = document.getElementById('searchClear');
+            if (clearBtn) {
+                if (search.length > 0) clearBtn.classList.add('visible');
+                else clearBtn.classList.remove('visible');
+            }
 
-document.getElementById('passwordInput').focus();
-</script>
+            try {
+                const r = await fetch(
+                    `${API}/api/admin/users?token=${encodeURIComponent(adminToken)}&page=${page}&per_page=20&search=${encodeURIComponent(search)}`
+                    );
+                if (r.status === 403) { logout(); return; }
+                const d = await r.json();
+                totalUsers = d.total || 0;
+
+                document.getElementById('totalBadge').textContent = d.total;
+                document.getElementById('userCountSub').textContent = `Jami ${formatNum(d.total)} ta foydalanuvchi`;
+
+                if (!d.users || d.users.length === 0) {
+                    wrap.innerHTML =
+                        '<div class="empty-state"><i class="fas fa-inbox"></i>Hech qanday foydalanuvchi topilmadi</div>';
+                    return;
+                }
+                wrap.innerHTML = buildTable(d.users, true);
+                renderPagination(d.total, page, d.per_page || 20);
+            } catch (e) {
+                wrap.innerHTML =
+                '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>Server xatosi</div>';
+                showToast('❌ Foydalanuvchilarni yuklab bo\'lmadi');
+            }
+        }
+
+        function buildTable(users, showActions) {
+            const rows = users.map(u => {
+                const phoneHtml = u.phone_number ?
+                    `<span class="phone" title="Telefon raqami">📞 ${esc(u.phone_number)}</span>` :
+                    `<span class="phone-none">— kiritilmagan</span>`;
+                const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Ismsiz';
+                const username = u.username ? `@${esc(u.username)}` : '<span style="color:var(--muted)">—</span>';
+                const date = (u.registered_at || '').substring(0, 10);
+                const score = u.avg_score != null ? Math.round(u.avg_score) + '%' : '—';
+                const userIdHtml =
+                    `<span class="userid" onclick="copyToClipboard('${u.user_id}', event)" title="ID: ${u.user_id} • Bosib nusxalash">🆔 ${u.user_id}</span>`;
+                const actions = showActions ? `
+                    <div class="action-btns">
+                        <button class="btn btn-ghost btn-sm" onclick="openUser(${u.user_id})" title="Batafsil ko'rish"><i class="fas fa-eye"></i></button>
+                        <button class="btn btn-danger btn-sm" onclick="confirmDelete(${u.user_id}, '${esc(name)}')" title="O'chirish"><i class="fas fa-trash-can"></i></button>
+                    </div>` : `<button class="btn btn-ghost btn-sm" onclick="openUser(${u.user_id})"><i class="fas fa-eye"></i> Ko'rish</button>`;
+                return `<tr>
+                    <td>
+                        <div class="user-name">${esc(name)}</div>
+                        ${userIdHtml}
+                    </td>
+                    <td><span class="user-username">${username}</span></td>
+                    <td>${phoneHtml}</td>
+                    <td><span class="badge-pill badge-blue">📄 ${u.files_count || 0}</span></td>
+                    <td><span class="badge-pill badge-green">✅ ${u.results_count || 0}</span></td>
+                    <td><span class="badge-pill badge-accent">${score}</span></td>
+                    <td style="color:var(--muted);font-size:11.5px;">${date}</td>
+                    <td>${actions}</td>
+                </tr>`;
+            }).join('');
+
+            return `<table>
+                <thead><tr>
+                    <th>Ism / ID</th><th>Username</th><th>Telefon raqam</th>
+                    <th>Fayllar</th><th>Testlar</th><th>O'rtacha</th><th>Sana</th><th>Amallar</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        }
+
+        function renderPagination(total, page, perPage) {
+            const pages = Math.ceil(total / perPage);
+            const pagWrap = document.getElementById('paginationWrap');
+            if (pages <= 1) {
+                if (total > perPage) {
+                    pagWrap.style.display = 'flex';
+                    document.getElementById('pageInfo').textContent =
+                        `1–${Math.min(total, perPage)} / ${formatNum(total)}`;
+                    document.getElementById('pageBtns').innerHTML = '';
+                } else {
+                    pagWrap.style.display = 'none';
+                }
+                return;
+            }
+            pagWrap.style.display = 'flex';
+            document.getElementById('pageInfo').textContent =
+                `${(page-1)*perPage+1}–${Math.min(page*perPage, total)} / ${formatNum(total)}`;
+
+            let btns =
+                `<button class="page-btn" onclick="loadUsers(${page-1})" ${page===1?'disabled':''} title="Oldingi"><i class="fas fa-chevron-left"></i></button>`;
+            const start = Math.max(1, page - 2),
+                end = Math.min(pages, page + 2);
+            if (start > 1) btns += `<button class="page-btn" onclick="loadUsers(1)">1</button>`;
+            if (start > 2) btns += `<span style="color:var(--muted);padding:0 4px;">…</span>`;
+            for (let i = start; i <= end; i++) {
+                btns +=
+                    `<button class="page-btn ${i===page?'active':''}" onclick="loadUsers(${i})">${i}</button>`;
+            }
+            if (end < pages - 1) btns += `<span style="color:var(--muted);padding:0 4px;">…</span>`;
+            if (end < pages) btns += `<button class="page-btn" onclick="loadUsers(${pages})">${pages}</button>`;
+            btns +=
+                `<button class="page-btn" onclick="loadUsers(${page+1})" ${page===pages?'disabled':''} title="Keyingi"><i class="fas fa-chevron-right"></i></button>`;
+            document.getElementById('pageBtns').innerHTML = btns;
+        }
+
+        function debounceSearch() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => loadUsers(1), 350);
+        }
+
+        function clearSearch() {
+            const input = document.getElementById('searchInput');
+            if (input) {
+                input.value = '';
+                document.getElementById('searchClear').classList.remove('visible');
+                loadUsers(1);
+                input.focus();
+            }
+        }
+
+        // ─── USER DETAIL MODAL ───
+        async function openUser(userId) {
+            const modal = document.getElementById('userModal');
+            document.getElementById('modalTitle').textContent = '👤 Foydalanuvchi ma\'lumotlari';
+            document.getElementById('modalBody').innerHTML =
+                '<div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Ma\'lumot yuklanmoqda...</div></div>';
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+
+            try {
+                const r = await fetch(
+                    `${API}/api/admin/user/${userId}?token=${encodeURIComponent(adminToken)}`);
+                const d = await r.json();
+                if (!d.user) {
+                    document.getElementById('modalBody').innerHTML =
+                        '<div class="empty-state"><i class="fas fa-user-slash"></i>Foydalanuvchi topilmadi</div>';
+                    return;
+                }
+                const u = d.user;
+                const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Ismsiz';
+
+                const filesHtml = d.files && d.files.length ? d.files.map(f => `
+                    <div class="mini-card">
+                        <div class="mc-name"><i class="fas fa-file-alt" style="color:var(--accent);"></i> ${esc(f.original_name || f.file_name || 'Fayl')}</div>
+                        <div class="mc-meta">
+                            <span>📝 ${f.questions_count || 0} savol</span>
+                            <span>📅 ${(f.uploaded_at||'').substring(0,10)}</span>
+                        </div>
+                    </div>`).join('') :
+                    '<div style="color:var(--muted);font-size:13px;padding:8px 0;">📭 Hali fayl yuklamagan</div>';
+
+                const resultsHtml = d.results && d.results.length ? d.results.map(r => {
+                    const emoji = r.score >= 80 ? '🌟' : r.score >= 60 ? '👍' : r.score >= 40 ? '📚' : '💪';
+                    return `<div class="mini-card">
+                        <div class="mc-name">${emoji} ${esc(r.file_name||'Test')}</div>
+                        <div class="mc-meta">
+                            <span style="color:var(--green)">✅ ${r.correct_answers}</span>
+                            <span style="color:var(--red)">❌ ${r.wrong_answers}</span>
+                            <span style="color:var(--dim)">⊘ ${r.skipped_answers}</span>
+                            <span style="color:var(--accent2);font-weight:700">${r.score}%</span>
+                            <span>🕐 ${(r.test_date||'').substring(0,16).replace('T',' ')}</span>
+                        </div>
+                    </div>`;
+                }).join('') :
+                    '<div style="color:var(--muted);font-size:13px;padding:8px 0;">📭 Hali test topshirmagan</div>';
+
+                document.getElementById('modalTitle').textContent = '👤 ' + name;
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="info-row"><div class="lbl">🆔 Telegram ID</div><div class="val"><span class="userid" onclick="copyToClipboard('${u.user_id}', event)" style="cursor:pointer;">${u.user_id}</span> <span style="font-size:10px;color:var(--muted);">(bosib nusxalash)</span></div></div>
+                    <div class="info-row"><div class="lbl">👤 Ism</div><div class="val">${esc(name)}</div></div>
+                    <div class="info-row"><div class="lbl">📛 Username</div><div class="val" style="color:var(--accent2)">${u.username ? '@'+esc(u.username) : '<span style="color:var(--muted)">— kiritilmagan</span>'}</div></div>
+                    <div class="info-row"><div class="lbl">📞 Telefon raqam</div><div class="val">${u.phone_number ? '<span class="phone">📞 '+esc(u.phone_number)+'</span>' : '<span style="color:var(--muted)">— kiritilmagan</span>'}</div></div>
+                    <div class="info-row"><div class="lbl">📅 Ro'yxatdan o'tgan</div><div class="val" style="color:var(--dim)">${(u.registered_at||'').substring(0,16).replace('T',' ')}</div></div>
+
+                    <div class="section-title"><i class="fas fa-file-alt"></i> Yuklangan fayllar (${(d.files||[]).length})</div>
+                    ${filesHtml}
+
+                    <div class="section-title"><i class="fas fa-square-poll-vertical"></i> Test natijalari (${(d.results||[]).length})</div>
+                    ${resultsHtml}
+
+                    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+                        <button class="btn btn-danger" style="width:100%;" onclick="confirmDelete(${u.user_id}, '${esc(name)}'); closeModal();">
+                            <i class="fas fa-trash-can"></i> Foydalanuvchini butunlay o'chirish
+                        </button>
+                    </div>
+                `;
+            } catch (e) {
+                document.getElementById('modalBody').innerHTML =
+                    '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>Xatolik yuz berdi</div>';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('userModal').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        // Close modal on overlay click or Escape
+        document.getElementById('userModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('userModal');
+                if (modal.classList.contains('open')) closeModal();
+            }
+        });
+
+        // ─── DELETE USER ───
+        function confirmDelete(userId, name) {
+            if (!confirm(
+                    `"${name}" foydalanuvchisini o'chirishni tasdiqlaysizmi?\n\n⚠️ DIQQAT: Uning barcha fayllari va test natijalari ham butunlay o'chiriladi!\n\nBu amalni qaytarib bo'lmaydi.`
+                    )) return;
+            deleteUser(userId);
+        }
+
+        async function deleteUser(userId) {
+            try {
+                const r = await fetch(
+                    `${API}/api/admin/delete_user/${userId}?token=${encodeURIComponent(adminToken)}`, {
+                        method: 'DELETE'
+                    });
+                const d = await r.json();
+                if (d.ok) {
+                    showToast('✅ Foydalanuvchi muvaffaqiyatli o\'chirildi');
+                    loadUsers(currentPage);
+                    loadStats();
+                } else {
+                    showToast('❌ ' + (d.error || 'O\'chirishda xatolik yuz berdi'));
+                }
+            } catch (e) {
+                showToast('❌ Server bilan bog\'lanib bo\'lmadi');
+            }
+        }
+
+        // ─── UTILS ───
+        function esc(s) {
+            if (!s) return '';
+            return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                "'": '&#39;' } [c]));
+        }
+
+        function formatNum(n) {
+            if (n == null) return '—';
+            return Number(n).toLocaleString('uz-UZ');
+        }
+
+        function copyToClipboard(text, event) {
+            if (event) event.stopPropagation();
+            navigator.clipboard.writeText(String(text)).then(() => {
+                showToast('📋 Nusxalandi: ' + text);
+            }).catch(() => {
+                showToast('❌ Nusxalab bo\'lmadi');
+            });
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            clearTimeout(t._t);
+            t._t = setTimeout(() => t.classList.remove('show'), 2800);
+        }
+
+        // ─── INIT ───
+        document.getElementById('passwordInput').focus();
+    </script>
 </body>
 </html>
