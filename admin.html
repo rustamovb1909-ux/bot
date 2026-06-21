@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin Panel</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0a0b14;--bg2:#11131f;--card:#181b2e;--card2:#1f2238;
+  --border:rgba(255,255,255,0.07);--text:#f0f2f7;--dim:#8b94ad;--muted:#5a637d;
+  --accent:#7c5cfc;--accent2:#b8bfff;--glow:rgba(124,92,252,0.35);
+  --green:#22c55e;--green-bg:rgba(34,197,94,0.1);
+  --red:#ef4444;--red-bg:rgba(239,68,68,0.1);
+  --orange:#f59e0b;--blue:#3b82f6;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+
+/* LOGIN */
+#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px 32px;width:100%;max-width:380px;text-align:center;}
+.login-icon{width:64px;height:64px;background:linear-gradient(135deg,#7c5cfc,#5b3fd9);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;margin:0 auto 20px;box-shadow:0 8px 24px var(--glow);}
+.login-box h2{font-size:22px;font-weight:800;margin-bottom:6px;}
+.login-box p{font-size:13px;color:var(--dim);margin-bottom:24px;}
+.input-wrap{position:relative;margin-bottom:14px;}
+.input-wrap i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;}
+.input-wrap input{width:100%;background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:13px 14px 13px 40px;color:var(--text);font-size:14px;outline:none;transition:border-color 0.2s;}
+.input-wrap input:focus{border-color:var(--accent);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 20px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;border:none;font-family:inherit;transition:all 0.2s;}
+.btn-primary{background:linear-gradient(135deg,#7c5cfc,#5b3fd9);color:#fff;box-shadow:0 6px 20px var(--glow);width:100%;}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 28px var(--glow);}
+.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid rgba(239,68,68,0.25);padding:7px 14px;font-size:12px;border-radius:8px;}
+.btn-danger:hover{background:var(--red);color:#fff;}
+.btn-ghost{background:transparent;color:var(--dim);border:1px solid var(--border);padding:7px 14px;font-size:12px;border-radius:8px;}
+.btn-ghost:hover{background:var(--card2);color:var(--text);}
+.err-msg{color:var(--red);font-size:12px;margin-top:10px;display:none;}
+
+/* LAYOUT */
+#adminPage{display:none;}
+.sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;padding:20px 0;z-index:10;}
+.sidebar .logo{display:flex;align-items:center;gap:10px;padding:0 20px 24px;}
+.sidebar .logo-icon{width:38px;height:38px;background:linear-gradient(135deg,#7c5cfc,#5b3fd9);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;}
+.sidebar .logo span{font-size:16px;font-weight:800;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--dim);font-size:13.5px;font-weight:600;cursor:pointer;transition:all 0.2s;border-left:3px solid transparent;}
+.nav-item:hover{color:var(--text);background:rgba(124,92,252,0.06);}
+.nav-item.active{color:var(--accent2);background:rgba(124,92,252,0.1);border-left-color:var(--accent);}
+.nav-item i{width:18px;text-align:center;font-size:14px;}
+.sidebar-bottom{margin-top:auto;padding:0 20px;}
+.sidebar-user{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.main{margin-left:220px;padding:28px;min-height:100vh;}
+
+/* TOP BAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
+.topbar h1{font-size:22px;font-weight:800;}
+.topbar .sub{font-size:13px;color:var(--dim);margin-top:2px;}
+.search-wrap{position:relative;}
+.search-wrap i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;}
+.search-wrap input{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px 9px 36px;color:var(--text);font-size:13px;outline:none;width:220px;transition:border-color 0.2s;}
+.search-wrap input:focus{border-color:var(--accent);}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:28px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 16px;}
+.stat-card .s-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:12px;}
+.stat-card .s-val{font-size:26px;font-weight:800;letter-spacing:-1px;}
+.stat-card .s-label{font-size:11px;color:var(--dim);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px;}
+.purple-bg{background:rgba(124,92,252,0.12);color:#b8bfff;}
+.green-bg{background:rgba(34,197,94,0.12);color:var(--green);}
+.orange-bg{background:rgba(245,158,11,0.12);color:var(--orange);}
+.blue-bg{background:rgba(59,130,246,0.12);color:var(--blue);}
+.red-bg-soft{background:rgba(239,68,68,0.12);color:var(--red);}
+
+/* TABLE */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+.table-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.table-head .title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.table-head .title i{color:var(--accent);font-size:13px;}
+.table-head .badge{background:rgba(124,92,252,0.12);color:var(--accent2);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+table{width:100%;border-collapse:collapse;}
+th{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:700;padding:12px 16px;text-align:left;background:var(--bg2);border-bottom:1px solid var(--border);}
+td{padding:13px 16px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,0.02);}
+.badge-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.badge-green{background:var(--green-bg);color:var(--green);}
+.badge-gray{background:rgba(255,255,255,0.06);color:var(--dim);}
+.badge-blue{background:rgba(59,130,246,0.12);color:var(--blue);}
+.phone{font-family:monospace;font-size:12.5px;color:var(--accent2);}
+.userid{font-family:monospace;font-size:11px;color:var(--muted);}
+.action-btns{display:flex;gap:6px;}
+
+/* PAGINATION */
+.pagination{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-top:1px solid var(--border);}
+.pagination .info{font-size:12px;color:var(--dim);}
+.page-btns{display:flex;gap:6px;}
+.page-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--dim);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;font-family:inherit;font-weight:700;}
+.page-btn:hover:not(:disabled){border-color:var(--accent);color:var(--text);}
+.page-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.page-btn:disabled{opacity:0.3;cursor:not-allowed;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:20px;width:100%;max-width:560px;max-height:85vh;overflow-y:auto;}
+.modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1;}
+.modal-head h3{font-size:17px;font-weight:800;}
+.modal-close{width:32px;height:32px;border-radius:8px;background:var(--card2);border:none;color:var(--dim);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.modal-close:hover{color:var(--text);}
+.modal-body{padding:20px 24px;}
+.info-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.info-row:last-child{border-bottom:none;}
+.info-row .lbl{font-size:12px;color:var(--dim);width:130px;flex-shrink:0;}
+.info-row .val{font-size:13px;font-weight:600;flex:1;}
+.section-title{font-size:13px;font-weight:700;color:var(--accent2);margin:16px 0 10px;text-transform:uppercase;letter-spacing:0.5px;}
+.mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;}
+.mini-card .mc-name{font-size:13px;font-weight:600;}
+.mini-card .mc-meta{font-size:11px;color:var(--dim);margin-top:3px;display:flex;gap:10px;}
+
+/* LOADER */
+.loader{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.15);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-state{text-align:center;padding:40px;color:var(--dim);}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card2);border:1px solid var(--border);padding:12px 18px;border-radius:12px;font-size:13px;opacity:0;transform:translateY(10px);transition:all 0.3s;z-index:200;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* PAGES */
+.tab-page{display:none;}
+.tab-page.active{display:block;}
+
+@media(max-width:900px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .sidebar{width:60px;}
+  .sidebar .logo span,.nav-item span,.sidebar-user,.sidebar-bottom .btn{display:none;}
+  .nav-item{justify-content:center;padding:12px;}
+  .main{margin-left:60px;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginPage">
+  <div class="login-box">
+    <div class="login-icon"><i class="fas fa-shield-alt"></i></div>
+    <h2>Admin Panel</h2>
+    <p>Kirish uchun parolni kiriting</p>
+    <div class="input-wrap">
+      <i class="fas fa-lock"></i>
+      <input type="password" id="passwordInput" placeholder="Parol" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <button class="btn btn-primary" onclick="doLogin()"><i class="fas fa-sign-in-alt"></i> Kirish</button>
+    <div class="err-msg" id="loginErr">Parol noto'g'ri!</div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="adminPage">
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon"><i class="fas fa-shield-alt"></i></div>
+      <span>Admin</span>
+    </div>
+    <div class="nav-item active" onclick="showTab('dashboard')" id="nav-dashboard">
+      <i class="fas fa-chart-pie"></i><span>Dashboard</span>
+    </div>
+    <div class="nav-item" onclick="showTab('users')" id="nav-users">
+      <i class="fas fa-users"></i><span>Foydalanuvchilar</span>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user">Admin sifatida kirgansiz</div>
+      <button class="btn btn-ghost" onclick="logout()" style="width:100%;"><i class="fas fa-sign-out-alt"></i> <span>Chiqish</span></button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="tab-page active" id="tab-dashboard">
+      <div class="topbar">
+        <div>
+          <h1>Dashboard</h1>
+          <div class="sub">Umumiy statistika</div>
+        </div>
+        <button class="btn btn-ghost" onclick="loadStats()" style="padding:9px 16px;font-size:13px;">
+          <i class="fas fa-sync-alt"></i> Yangilash
+        </button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="s-icon purple-bg"><i class="fas fa-users"></i></div><div class="s-val">—</div><div class="s-label">Jami foydalanuvchi</div></div>
+        <div class="stat-card"><div class="s-icon green-bg"><i class="fas fa-phone"></i></div><div class="s-val">—</div><div class="s-label">Telefon ulashgan</div></div>
+        <div class="stat-card"><div class="s-icon blue-bg"><i class="fas fa-file-alt"></i></div><div class="s-val">—</div><div class="s-label">Yuklangan fayllar</div></div>
+        <div class="stat-card"><div class="s-icon orange-bg"><i class="fas fa-question-circle"></i></div><div class="s-val">—</div><div class="s-label">Jami savollar</div></div>
+        <div class="stat-card"><div class="s-icon red-bg-soft"><i class="fas fa-poll"></i></div><div class="s-val">—</div><div class="s-label">Topshirilgan testlar</div></div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head">
+          <div class="title"><i class="fas fa-users"></i> Oxirgi foydalanuvchilar</div>
+          <div class="badge" id="dashUserCount">0</div>
+        </div>
+        <div id="dashUserTable"><div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div></div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="tab-page" id="tab-users">
+      <div class="topbar">
+        <div>
+          <h1>Foydalanuvchilar</h1>
+          <div class="sub" id="userCountSub">Yuklanmoqda...</div>
+        </div>
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" id="searchInput" placeholder="Ism, telefon, ID..." oninput="debounceSearch()"/>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head">
+          <div class="title"><i class="fas fa-list"></i> Barcha foydalanuvchilar</div>
+          <div class="badge" id="totalBadge">0</div>
+        </div>
+        <div id="usersTableWrap">
+          <div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div>
+        </div>
+        <div class="pagination" id="paginationWrap" style="display:none;">
+          <div class="info" id="pageInfo"></div>
+          <div class="page-btns" id="pageBtns"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- USER DETAIL MODAL -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">Foydalanuvchi</h3>
+      <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="loading-state"><div class="loader"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = window.location.origin;
+let adminToken = sessionStorage.getItem('adminToken') || '';
+let currentPage = 1;
+let totalUsers = 0;
+let searchTimer = null;
+let currentDeleteId = null;
+
+// ─── LOGIN ───
+async function doLogin() {
+  const pw = document.getElementById('passwordInput').value;
+  if (!pw) return;
+  try {
+    const r = await fetch(`${API}/api/admin/login`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({password: pw})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      adminToken = d.token;
+      sessionStorage.setItem('adminToken', adminToken);
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('adminPage').style.display = 'block';
+      loadStats();
+      loadUsers();
+    } else {
+      const e = document.getElementById('loginErr');
+      e.style.display = 'block';
+      setTimeout(() => e.style.display = 'none', 2500);
+    }
+  } catch(err) { showToast('❌ Server xatosi'); }
+}
+
+function logout() {
+  sessionStorage.removeItem('adminToken');
+  adminToken = '';
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('adminPage').style.display = 'none';
+  document.getElementById('passwordInput').value = '';
+}
+
+// Auto-login if token exists
+if (adminToken) {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('adminPage').style.display = 'block';
+  loadStats();
+  loadUsers();
+}
+
+// ─── TABS ───
+function showTab(name) {
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+// ─── STATS ───
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/api/admin/stats?token=${adminToken}`);
+    if (r.status === 403) { logout(); return; }
+    const d = await r.json();
+    const grid = document.getElementById('statsGrid');
+    const icons = ['purple-bg fa-users','green-bg fa-phone','blue-bg fa-file-alt','orange-bg fa-question-circle','red-bg-soft fa-poll'];
+    const labels = ['Jami foydalanuvchi','Telefon ulashgan','Yuklangan fayllar','Jami savollar','Topshirilgan testlar'];
+    const vals = [d.total_users, d.users_with_phone, d.total_files, d.total_questions, d.total_results];
+    grid.innerHTML = icons.map((ic,i) => {
+      const [cls, ico] = ic.split(' ');
+      return `<div class="stat-card">
+        <div class="s-icon ${cls}"><i class="fas ${ico}"></i></div>
+        <div class="s-val">${vals[i]}</div>
+        <div class="s-label">${labels[i]}</div>
+      </div>`;
+    }).join('');
+
+    // Dashboard jadval
+    loadDashUsers();
+  } catch(e) { showToast('❌ Stats yuklanmadi'); }
+}
+
+async function loadDashUsers() {
+  try {
+    const r = await fetch(`${API}/api/admin/users?token=${adminToken}&per_page=5`);
+    const d = await r.json();
+    document.getElementById('dashUserCount').textContent = d.total;
+    document.getElementById('dashUserTable').innerHTML = buildTable(d.users, false);
+  } catch(e) {}
+}
+
+// ─── USERS ───
+async function loadUsers(page = 1) {
+  currentPage = page;
+  const search = document.getElementById('searchInput').value.trim();
+  document.getElementById('usersTableWrap').innerHTML = '<div class="loading-state"><div class="loader"></div><div style="margin-top:10px;">Yuklanmoqda...</div></div>';
+  document.getElementById('paginationWrap').style.display = 'none';
+
+  try {
+    const r = await fetch(`${API}/api/admin/users?token=${adminToken}&page=${page}&per_page=20&search=${encodeURIComponent(search)}`);
+    if (r.status === 403) { logout(); return; }
+    const d = await r.json();
+    totalUsers = d.total;
+
+    document.getElementById('totalBadge').textContent = d.total;
+    document.getElementById('userCountSub').textContent = `Jami ${d.total} ta foydalanuvchi`;
+
+    if (d.users.length === 0) {
+      document.getElementById('usersTableWrap').innerHTML = '<div class="loading-state" style="color:var(--muted)"><i class="fas fa-inbox" style="font-size:32px;margin-bottom:10px;"></i><br>Foydalanuvchi topilmadi</div>';
+      return;
+    }
+
+    document.getElementById('usersTableWrap').innerHTML = buildTable(d.users, true);
+    renderPagination(d.total, page, d.per_page);
+  } catch(e) { showToast('❌ Yuklanmadi'); }
+}
+
+function buildTable(users, showActions) {
+  const rows = users.map(u => {
+    const phone = u.phone_number ? `<span class="phone">${u.phone_number}</span>` : '<span class="badge-pill badge-gray">Yo\'q</span>';
+    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
+    const username = u.username ? `@${u.username}` : '—';
+    const date = (u.registered_at || '').substring(0, 10);
+    const score = u.avg_score ? Math.round(u.avg_score) + '%' : '—';
+    const actions = showActions ? `
+      <div class="action-btns">
+        <button class="btn btn-ghost" onclick="openUser(${u.user_id})" title="Ko'rish"><i class="fas fa-eye"></i></button>
+        <button class="btn btn-danger" onclick="confirmDelete(${u.user_id}, '${esc(name)}')" title="O'chirish"><i class="fas fa-trash"></i></button>
+      </div>` : `<button class="btn btn-ghost" onclick="openUser(${u.user_id})"><i class="fas fa-eye"></i></button>`;
+    return `<tr>
+      <td><div style="font-weight:600">${esc(name)}</div><div class="userid">${u.user_id}</div></td>
+      <td style="color:var(--dim)">${esc(username)}</td>
+      <td>${phone}</td>
+      <td><span class="badge-pill badge-blue">${u.files_count}</span></td>
+      <td><span class="badge-pill badge-green">${u.results_count}</span></td>
+      <td style="color:var(--dim)">${score}</td>
+      <td style="color:var(--muted);font-size:12px">${date}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+
+  return `<table>
+    <thead><tr>
+      <th>Ism</th><th>Username</th><th>Telefon</th>
+      <th>Fayllar</th><th>Testlar</th><th>O'rtacha</th><th>Sana</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderPagination(total, page, perPage) {
+  const pages = Math.ceil(total / perPage);
+  if (pages <= 1) return;
+  document.getElementById('paginationWrap').style.display = 'flex';
+  document.getElementById('pageInfo').textContent = `${(page-1)*perPage+1}–${Math.min(page*perPage, total)} / ${total}`;
+
+  let btns = `<button class="page-btn" onclick="loadUsers(${page-1})" ${page===1?'disabled':''}><i class="fas fa-chevron-left"></i></button>`;
+  const start = Math.max(1, page-2), end = Math.min(pages, page+2);
+  for (let i = start; i <= end; i++) {
+    btns += `<button class="page-btn ${i===page?'active':''}" onclick="loadUsers(${i})">${i}</button>`;
+  }
+  btns += `<button class="page-btn" onclick="loadUsers(${page+1})" ${page===pages?'disabled':''}><i class="fas fa-chevron-right"></i></button>`;
+  document.getElementById('pageBtns').innerHTML = btns;
+}
+
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadUsers(1), 400);
+}
+
+// ─── USER DETAIL ───
+async function openUser(userId) {
+  document.getElementById('modalTitle').textContent = 'Foydalanuvchi ma\'lumotlari';
+  document.getElementById('modalBody').innerHTML = '<div class="loading-state"><div class="loader"></div></div>';
+  document.getElementById('userModal').classList.add('open');
+
+  try {
+    const r = await fetch(`${API}/api/admin/user/${userId}?token=${adminToken}`);
+    const d = await r.json();
+    if (!d.user) { document.getElementById('modalBody').innerHTML = '<div class="loading-state">Topilmadi</div>'; return; }
+
+    const u = d.user;
+    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
+
+    const filesHtml = d.files.length ? d.files.map(f => `
+      <div class="mini-card">
+        <div class="mc-name"><i class="fas fa-file-alt" style="color:var(--accent);margin-right:6px;"></i>${esc(f.original_name || f.file_name || '—')}</div>
+        <div class="mc-meta">
+          <span><i class="fas fa-list"></i> ${f.questions_count} savol</span>
+          <span><i class="fas fa-calendar"></i> ${(f.uploaded_at||'').substring(0,10)}</span>
+        </div>
+      </div>`).join('') : '<div style="color:var(--muted);font-size:13px;">Fayl yuklamagan</div>';
+
+    const resultsHtml = d.results.length ? d.results.map(r => {
+      const emoji = r.score>=80?'🌟':r.score>=60?'👍':r.score>=40?'📚':'💪';
+      return `<div class="mini-card">
+        <div class="mc-name">${emoji} ${esc(r.file_name||'Test')}</div>
+        <div class="mc-meta">
+          <span style="color:var(--green)">✓ ${r.correct_answers}</span>
+          <span style="color:var(--red)">✗ ${r.wrong_answers}</span>
+          <span style="color:var(--dim)">⊘ ${r.skipped_answers}</span>
+          <span style="color:var(--accent2);font-weight:700">${r.score}%</span>
+          <span>${(r.test_date||'').substring(0,16).replace('T',' ')}</span>
+        </div>
+      </div>`;
+    }).join('') : '<div style="color:var(--muted);font-size:13px;">Hali test topshirmagan</div>';
+
+    document.getElementById('modalTitle').textContent = name;
+    document.getElementById('modalBody').innerHTML = `
+      <div class="info-row"><div class="lbl">Telegram ID</div><div class="val" style="font-family:monospace">${u.user_id}</div></div>
+      <div class="info-row"><div class="lbl">Ism</div><div class="val">${esc(name)}</div></div>
+      <div class="info-row"><div class="lbl">Username</div><div class="val" style="color:var(--accent2)">${u.username ? '@'+esc(u.username) : '—'}</div></div>
+      <div class="info-row"><div class="lbl">Telefon raqam</div><div class="val"><span class="phone">${u.phone_number || '—'}</span></div></div>
+      <div class="info-row"><div class="lbl">Ro'yxatdan o'tgan</div><div class="val" style="color:var(--dim)">${(u.registered_at||'').substring(0,16).replace('T',' ')}</div></div>
+
+      <div class="section-title"><i class="fas fa-file-alt"></i> Yuklangan fayllar (${d.files.length})</div>
+      ${filesHtml}
+
+      <div class="section-title"><i class="fas fa-poll"></i> Test natijalari (${d.results.length})</div>
+      ${resultsHtml}
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+        <button class="btn btn-danger" style="width:100%;" onclick="confirmDelete(${u.user_id}, '${esc(name)}'); closeModal();">
+          <i class="fas fa-trash"></i> Foydalanuvchini o'chirish
+        </button>
+      </div>
+    `;
+  } catch(e) { document.getElementById('modalBody').innerHTML = '<div class="loading-state">Xatolik yuz berdi</div>'; }
+}
+
+function closeModal() {
+  document.getElementById('userModal').classList.remove('open');
+}
+document.getElementById('userModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ─── DELETE USER ───
+function confirmDelete(userId, name) {
+  if (!confirm(`"${name}" foydalanuvchisini o'chirishni tasdiqlaysizmi?\n\nBarcha fayllari va natijalari ham o'chiriladi!`)) return;
+  deleteUser(userId);
+}
+
+async function deleteUser(userId) {
+  try {
+    const r = await fetch(`${API}/api/admin/delete_user/${userId}?token=${adminToken}`, {method:'DELETE'});
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ Foydalanuvchi o\'chirildi');
+      loadUsers(currentPage);
+      loadStats();
+    } else {
+      showToast('❌ ' + (d.error || 'Xatolik'));
+    }
+  } catch(e) { showToast('❌ Server xatosi'); }
+}
+
+// ─── UTILS ───
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+document.getElementById('passwordInput').focus();
+</script>
+</body>
+</html>
