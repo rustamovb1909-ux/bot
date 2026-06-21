@@ -305,10 +305,33 @@ def parse_html_content(html):
     soup = BeautifulSoup(html, 'html.parser')
     questions = []
     tables = soup.find_all('table')
+
     for table in tables:
         rows = table.find_all('tr')
-        for row in rows:
-            cells = row.find_all(['td', 'th'])
+        if not rows:
+            continue
+
+        cells_per_row = [row.find_all(['td', 'th']) for row in rows]
+
+        # Format A: 1 ustunli jadval — har bir jadvalda 1 savol + 2..5 javob
+        # (Bu BuxDU test formatiga mos: birinchi qator=savol, qolganlar=variantlar)
+        if all(len(c) == 1 for c in cells_per_row) and 3 <= len(rows) <= 8:
+            texts = [normalize_text(r[0].get_text()) for r in cells_per_row]
+            texts = [t for t in texts if t]
+            if len(texts) >= 3:
+                q_text = texts[0]
+                opts = texts[1:]
+                while len(opts) < 4:
+                    opts.append('')
+                questions.append({
+                    'text': q_text,
+                    'options': opts[:4],
+                    'correct': 'A',
+                })
+            continue
+
+        # Format B: 5 ta yoki undan ko'p ustunli jadval (Savol|To'g'ri|Xato1|Xato2|Xato3)
+        for row, cells in zip(rows, cells_per_row):
             if len(cells) >= 5:
                 q_text = normalize_text(cells[0].get_text())
                 correct = normalize_text(cells[1].get_text())
@@ -323,9 +346,12 @@ def parse_html_content(html):
                         'options': all_opts[:4],
                         'correct': 'A',
                     })
+
+    # Jadvallardan savol topilmasa, matn rejimiga o'tamiz
     if not questions:
         text = soup.get_text('\n')
         questions = parse_text_content(text)
+
     return questions
 
 
