@@ -40,6 +40,8 @@ load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 WEBAPP_URL = RENDER_EXTERNAL_URL or os.getenv("WEBAPP_URL") or "https://example.com"
+ADMIN_ID = os.getenv("ADMIN_ID", "")  # .env da ADMIN_ID=sizning_telegram_id
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "admin_secret_2025")  # admin panel paroli
 
 if not TOKEN:
     raise ValueError("BOT_TOKEN o'rnatilmagan! .env faylga BOT_TOKEN=qabul qilingan_token qo'ying")
@@ -1046,7 +1048,7 @@ def api_delete_test(file_id):
             ).fetchone()
         if not file_row:
             conn.close()
-            return jsonify({'error': 'Test topilmadi yoki ruxsat yoq'}), 404
+            return jsonify({"error": "Test topilmadi yoki ruxsat yoq"}), 404
 
         file_path = file_row['file_path']
 
@@ -1103,6 +1105,159 @@ def api_save_result():
         print(f"❌ api/save_result error: {e}", flush=True)
         return jsonify({'error': str(e)}), 500
 
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ADMIN PANEL ROUTES
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def check_admin(req):
+    """Admin tokenni tekshirish"""
+    token = req.headers.get('X-Admin-Token') or req.args.get('token')
+    return token == ADMIN_SECRET
+
+
+@app.route('/admin')
+def admin_page():
+    return send_from_directory('.', 'admin.html')
+
+
+@app.route('/api/admin/login', methods=['POST'])
+def admin_login():
+    data = request.get_json(silent=True) or {}
+    if data.get('password') == ADMIN_SECRET:
+        return jsonify({'ok': True, 'token': ADMIN_SECRET})
+    return jsonify({'ok': False, 'error': "Parol noto'g'ri"}), 401
+
+
+@app.route('/api/admin/stats')
+def admin_stats():
+    if not check_admin(request):
+        return jsonify({"error": "Ruxsat yoq"}), 403
+    conn = get_db()
+    c = conn.cursor()
+    stats = {
+        'total_users': c.execute('SELECT COUNT(*) FROM users').fetchone()[0],
+        'total_files': c.execute('SELECT COUNT(*) FROM files').fetchone()[0],
+        'total_questions': c.execute('SELECT COUNT(*) FROM test_questions').fetchone()[0],
+        'total_results': c.execute('SELECT COUNT(*) FROM test_results').fetchone()[0],
+        'users_with_phone': c.execute('SELECT COUNT(*) FROM users WHERE phone_number IS NOT NULL AND phone_number != ""').fetchone()[0],
+    }
+    conn.close()
+    return jsonify(stats)
+
+
+@app.route('/api/admin/users')
+def admin_users():
+    if not check_admin(request):
+        return jsonify({"error": "Ruxsat yoq"}), 403
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    search = request.args.get('search', '').strip()
+    offset = (page - 1) * per_page
+
+    conn = get_db()
+    c = conn.cursor()
+
+    where = ''
+    params_count = []
+    params_data = []
+    if search:
+        where = "WHERE u.first_name LIKE ? OR u.username LIKE ? OR u.phone_number LIKE ? OR CAST(u.user_id AS TEXT) LIKE ?"
+        like = f'%{search}%'
+        params_count = [like, like, like, like]
+        params_data = [like, like, like, like, per_page, offset]
+    else:
+        params_data = [per_page, offset]
+
+    total = c.execute(f'SELECT COUNT(*) FROM users u {where}', params_count).fetchone()[0]
+
+    rows = c.execute(f"""
+        SELECT
+            u.user_id, u.username, u.first_name, u.last_name,
+            u.phone_number, u.registered_at,
+            COUNT(DISTINCT f.id) as files_count,
+            COUNT(DISTINCT tr.id) as results_count,
+            COALESCE(AVG(tr.score), 0) as avg_score
+        FROM users u
+        LEFT JOIN files f ON f.user_id = u.user_id
+        LEFT JOIN test_results tr ON tr.user_id = u.user_id
+        {where}
+        GROUP BY u.user_id
+        ORDER BY u.registered_at DESC
+        LIMIT ? OFFSET ?
+    """, params_data).fetchall()
+
+    conn.close()
+    return jsonify({
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'users': [dict(r) for r in rows]
+    })
+
+
+@app.route('/api/admin/user/<int:user_id>')
+def admin_user_detail(user_id):
+    if not check_admin(request):
+        return jsonify({"error": "Ruxsat yoq"}), 403
+    conn = get_db()
+    c = conn.cursor()
+
+    user = c.execute('SELECT * FROM users WHERE user_id = ?', (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"error": "Foydalanuvchi topilmadi"}), 404
+
+    files = c.execute("""
+        SELECT f.id, f.original_name, f.file_size, f.uploaded_at,
+               COUNT(tq.id) as questions_count
+        FROM files f
+        LEFT JOIN test_questions tq ON tq.file_id = f.id
+        WHERE f.user_id = ?
+        GROUP BY f.id
+        ORDER BY f.uploaded_at DESC
+    """, (user_id,)).fetchall()
+
+    results = c.execute("""
+        SELECT tr.*, f.original_name as file_name
+        FROM test_results tr
+        LEFT JOIN files f ON f.id = tr.file_id
+        WHERE tr.user_id = ?
+        ORDER BY tr.test_date DESC
+        LIMIT 20
+    """, (user_id,)).fetchall()
+
+    conn.close()
+    return jsonify({
+        'user': dict(user),
+        'files': [dict(r) for r in files],
+        'results': [dict(r) for r in results],
+    })
+
+
+@app.route('/api/admin/delete_user/<int:user_id>', methods=['DELETE'])
+def admin_delete_user(user_id):
+    if not check_admin(request):
+        return jsonify({"error": "Ruxsat yoq"}), 403
+    conn = get_db()
+    c = conn.cursor()
+
+    # Fayllarni diskdan o'chirish
+    files = c.execute('SELECT file_path FROM files WHERE user_id = ?', (user_id,)).fetchall()
+    for f in files:
+        if f['file_path'] and os.path.exists(f['file_path']):
+            try:
+                os.unlink(f['file_path'])
+            except OSError:
+                pass
+
+    c.execute('DELETE FROM test_results WHERE user_id = ?', (user_id,))
+    c.execute('DELETE FROM test_questions WHERE file_id IN (SELECT id FROM files WHERE user_id = ?)', (user_id,))
+    c.execute('DELETE FROM files WHERE user_id = ?', (user_id,))
+    c.execute('DELETE FROM users WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # WEBHOOK
