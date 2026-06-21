@@ -194,6 +194,20 @@
             display: flex; align-items: center; justify-content: center;
             box-shadow: 0 4px 12px var(--accent-glow);
         }
+        .test-card .t-delete {
+            width: 36px; height: 36px;
+            background: transparent;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-muted); font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .test-card .t-delete:hover {
+            background: var(--red-bg);
+            border-color: var(--red);
+            color: var(--red);
+        }
 
         .empty-state {
             text-align: center; padding: 50px 20px;
@@ -850,6 +864,9 @@ function renderTests() {
             </div>
             <div class="t-actions">
                 <div class="t-badge">${t.questions}</div>
+                <button class="t-delete" data-id="${t.id}" title="O'chirish">
+                    <i class="fas fa-trash"></i>
+                </button>
                 <button class="t-play" data-id="${t.id}">
                     <i class="fas fa-play"></i>
                 </button>
@@ -857,18 +874,58 @@ function renderTests() {
         </div>
     `).join('');
 
-    list.querySelectorAll('.test-card, .t-play').forEach(el => {
-        el.addEventListener('click', (e) => {
-            const id = parseInt(el.dataset.id);
-            const t = state.tests.find(x => x.id === id);
-            if (!t) return;
-            state.selectedTestId = id;
-            document.getElementById('selectedFileName').textContent = t.name;
-            document.getElementById('selectedFileMeta').textContent = `${t.questions} ta savol mavjud`;
-            document.getElementById('startTestBtn').disabled = false;
-            showPage('pageCount');
+    list.querySelectorAll('.t-play, .test-card').forEach(el => {
+        if (el.classList.contains('t-play')) {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openTest(parseInt(el.dataset.id));
+            });
+        } else {
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.t-delete') || e.target.closest('.t-play')) return;
+                openTest(parseInt(el.dataset.id));
+            });
+        }
+    });
+
+    list.querySelectorAll('.t-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTest(parseInt(btn.dataset.id));
         });
     });
+}
+
+function openTest(id) {
+    const t = state.tests.find(x => x.id === id);
+    if (!t) return;
+    state.selectedTestId = id;
+    document.getElementById('selectedFileName').textContent = t.name;
+    document.getElementById('selectedFileMeta').textContent = `${t.questions} ta savol mavjud`;
+    document.getElementById('startTestBtn').disabled = false;
+    showPage('pageCount');
+}
+
+async function deleteTest(id) {
+    const t = state.tests.find(x => x.id === id);
+    if (!t) return;
+    if (!confirm(`"${t.name}" testini o'chirishni tasdiqlaysizmi?\n\nBarcha savollar va natijalar ham o'chiriladi.`)) return;
+
+    try {
+        const resp = await fetch(`${API}/api/delete_test/${id}?userId=${encodeURIComponent(tgUserId)}`, {
+            method: 'DELETE',
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            showToast('✅ Test o\'chirildi');
+            loadTests();
+        } else {
+            showToast('❌ ' + (data.error || 'O\'chirishda xatolik'));
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('❌ Server xatosi');
+    }
 }
 
 // ━━━ UPLOAD FILE ━━━
