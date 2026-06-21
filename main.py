@@ -4,6 +4,7 @@ Imtihon platformasi — Telegram bot + WebApp
 - .txt, .docx, .doc fayllarni qabul qilish (.doc avtomatik .docx ga o'tkaziladi)
 - 5 ta ustunli jadval yoki matn formatidagi testlarni parse qilish
 - Natijalarni saqlash va ko'rsatish
+- Admin uchun maxsus menyu, telefon so'ralmaydi, admin panel WebApp
 """
 import os
 import re
@@ -358,7 +359,7 @@ def parse_html_content(html):
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TELEGRAM BOT HANDLERLARI (o'zgarishsiz)
+# TELEGRAM BOT HANDLERLARI (ADMIN UCHUN QO‘SHIMCHA)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def md_escape(text):
     if not text:
@@ -381,6 +382,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not user:
         return
+    is_admin = str(user.id) == ADMIN_ID
     try:
         conn = get_db()
         c = conn.cursor()
@@ -389,13 +391,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (user.id, user.username, user.first_name, user.last_name),
         )
         conn.commit()
-        row = c.execute('SELECT phone_number FROM users WHERE user_id = ?', (user.id,)).fetchone()
-        phone = (row['phone_number'] if row else None) or ''
+        if not is_admin:
+            row = c.execute('SELECT phone_number FROM users WHERE user_id = ?', (user.id,)).fetchone()
+            phone = (row['phone_number'] if row else None) or ''
+        else:
+            phone = None   # admin uchun telefon so‘ralmaydi
         conn.close()
     except Exception as e:
         print(f"start DB error: {e}", flush=True)
         phone = None
-    if not phone:
+
+    if not is_admin and not phone:
         kb = ReplyKeyboardMarkup(
             [[KeyboardButton("📱 Telefon raqamni ulashish", request_contact=True)]],
             resize_keyboard=True,
@@ -410,23 +416,53 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=kb,
         )
     else:
-        await send_main_menu(update, user.first_name)
+        await send_main_menu(update, user.first_name, is_admin=is_admin)
 
 
-async def send_main_menu(update, first_name):
+async def send_main_menu(update, first_name, is_admin=False):
     safe_name = html_escape(first_name or 'foydalanuvchi')
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
-        [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
-        [InlineKeyboardButton("📊 Natijalarim", callback_data="my_results")],
-        [InlineKeyboardButton("📚 Mening testlarim", callback_data="my_tests")],
-        [InlineKeyboardButton("💡 Yordam", callback_data="help")],
-    ])
-    await update.message.reply_text(
-        f"✅ Xush kelibsiz, <b>{safe_name}</b>!\n\nQuyidagilardan birini tanlang:",
-        parse_mode="HTML",
-        reply_markup=kb,
-    )
+    if is_admin:
+        greeting = f"👑 Xush kelibsiz, Admin <b>{safe_name}</b>!"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👑 Admin panel", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/') + '/admin'))],
+            [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
+            [InlineKeyboardButton("📊 Natijalarim", callback_data="my_results")],
+            [InlineKeyboardButton("📚 Mening testlarim", callback_data="my_tests")],
+            [InlineKeyboardButton("💡 Yordam", callback_data="help")],
+        ])
+    else:
+        greeting = f"✅ Xush kelibsiz, <b>{safe_name}</b>!\n\nQuyidagilardan birini tanlang:"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
+            [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
+            [InlineKeyboardButton("📊 Natijalarim", callback_data="my_results")],
+            [InlineKeyboardButton("📚 Mening testlarim", callback_data="my_tests")],
+            [InlineKeyboardButton("💡 Yordam", callback_data="help")],
+        ])
+    await update.message.reply_text(greeting, parse_mode="HTML", reply_markup=kb)
+
+
+async def edit_main_menu(query, first_name, is_admin=False):
+    safe_name = html_escape(first_name or 'foydalanuvchi')
+    if is_admin:
+        greeting = f"👑 Xush kelibsiz, Admin <b>{safe_name}</b>!"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👑 Admin panel", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/') + '/admin'))],
+            [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
+            [InlineKeyboardButton("📊 Natijalarim", callback_data="my_results")],
+            [InlineKeyboardButton("📚 Mening testlarim", callback_data="my_tests")],
+            [InlineKeyboardButton("💡 Yordam", callback_data="help")],
+        ])
+    else:
+        greeting = f"✅ Xush kelibsiz, <b>{safe_name}</b>!\n\nQuyidagilardan birini tanlang:"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
+            [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
+            [InlineKeyboardButton("📊 Natijalarim", callback_data="my_results")],
+            [InlineKeyboardButton("📚 Mening testlarim", callback_data="my_tests")],
+            [InlineKeyboardButton("💡 Yordam", callback_data="help")],
+        ])
+    await query.edit_message_text(greeting, parse_mode="HTML", reply_markup=kb)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -475,13 +511,16 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Telefon raqam saqlandi: {phone}\n\nEndi botdan to'liq foydalanishingiz mumkin!",
         reply_markup=remove_kb,
     )
-    await send_main_menu(update, user.first_name)
+    await send_main_menu(update, user.first_name, is_admin=(str(user.id) == ADMIN_ID))
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data or ""
+    user_id = query.from_user.id
+    is_admin = str(user_id) == ADMIN_ID
+
     if data == "upload_file":
         await query.edit_message_text(
             "📤 <b>Test faylini yuboring</b>\n\n"
@@ -519,14 +558,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]]),
         )
     elif data == "back_to_main":
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🌐 Imtihon platformasi", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
-            [InlineKeyboardButton("📤 Test fayl yuklash", callback_data="upload_file")],
-            [InlineKeyboardButton("📊 Natijalarim", callback_data="my_results")],
-            [InlineKeyboardButton("📚 Mening testlarim", callback_data="my_tests")],
-            [InlineKeyboardButton("💡 Yordam", callback_data="help")],
-        ])
-        await query.edit_message_text("👋 Asosiy menyu:", reply_markup=kb)
+        await edit_main_menu(query, query.from_user.first_name, is_admin)
 
 
 async def show_user_tests(query):
@@ -610,6 +642,7 @@ def convert_doc_to_docx(doc_path):
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get('waiting_for_file'):
+        is_admin = str(update.effective_user.id) == ADMIN_ID
         await update.message.reply_text(
             "❗ Avval '📤 Test fayl yuklash' tugmasini bosing.",
             reply_markup=InlineKeyboardMarkup([[
@@ -720,10 +753,17 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         conn.commit()
         conn.close()
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🌐 Testni boshlash", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
-            [InlineKeyboardButton("🔙 Asosiy menyu", callback_data="back_to_main")],
-        ])
+        is_admin = str(update.effective_user.id) == ADMIN_ID
+        if is_admin:
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("👑 Admin panel", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/') + '/admin'))],
+                [InlineKeyboardButton("🔙 Asosiy menyu", callback_data="back_to_main")],
+            ])
+        else:
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🌐 Testni boshlash", web_app=WebAppInfo(url=WEBAPP_URL.rstrip('/')))],
+                [InlineKeyboardButton("🔙 Asosiy menyu", callback_data="back_to_main")],
+            ])
         await processing_msg.edit_text(
             f"✅ <b>Fayl saqlandi!</b>\n\n"
             f"📄 {md_escape(save_name)}\n"
