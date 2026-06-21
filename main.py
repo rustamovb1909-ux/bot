@@ -1015,6 +1015,61 @@ def api_test_questions(file_id):
         return jsonify({'questions': [], 'error': str(e)}), 200
 
 
+# /api/delete_test/<file_id> — testni o'chirish
+@app.route('/api/delete_test/<int:file_id>', methods=['DELETE'])
+def api_delete_test(file_id):
+    try:
+        user_id = request.args.get('userId')
+        if not user_id:
+            return jsonify({'error': 'userId kerak'}), 400
+
+        # user_id int yoki string bolishi mumkin
+        try:
+            user_id_int = int(user_id)
+        except (ValueError, TypeError):
+            user_id_int = None
+
+        conn = get_db()
+        c = conn.cursor()
+
+        # Avval int sifatida qidiramiz, topilmasa string sifatida
+        file_row = None
+        if user_id_int is not None:
+            file_row = c.execute(
+                'SELECT id, file_path FROM files WHERE id = ? AND user_id = ?',
+                (file_id, user_id_int),
+            ).fetchone()
+        if not file_row:
+            file_row = c.execute(
+                'SELECT id, file_path FROM files WHERE id = ? AND CAST(user_id AS TEXT) = ?',
+                (file_id, str(user_id)),
+            ).fetchone()
+        if not file_row:
+            conn.close()
+            return jsonify({'error': 'Test topilmadi yoki ruxsat yoq'}), 404
+
+        file_path = file_row['file_path']
+
+        # Avval bog'liq ma'lumotlarni o'chiramiz
+        c.execute('DELETE FROM test_results WHERE file_id = ?', (file_id,))
+        c.execute('DELETE FROM test_questions WHERE file_id = ?', (file_id,))
+        c.execute('DELETE FROM files WHERE id = ?', (file_id,))
+        conn.commit()
+        conn.close()
+
+        # Diskdan faylni o'chiramiz (mavjud bo'lsa)
+        if file_path and os.path.exists(file_path):
+            try:
+                os.unlink(file_path)
+            except OSError as e:
+                print(f"Fayl o'chirishda xatolik: {e}", flush=True)
+
+        return jsonify({'ok': True})
+    except Exception as e:
+        print(f"❌ api/delete_test error: {e}", flush=True)
+        return jsonify({'error': str(e)}), 500
+
+
 # /api/save_result — allaqachon mavjud, userId body dan olinadi (o'zgarmaydi)
 @app.route('/api/save_result', methods=['POST'])
 def api_save_result():
